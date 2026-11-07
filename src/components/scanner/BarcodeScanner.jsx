@@ -29,8 +29,8 @@ import { scanLogger } from '../../utils/scanLogger';
 
 export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
   const videoRef = useRef(null);
-  const controlsRef = useRef(null);
   const streamRef = useRef(null);
+  const scanIntervalRef = useRef(null);
   const fileInputRef = useRef(null);
   const isScanningLocked = useRef(false);
 
@@ -66,20 +66,18 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
   // Stop camera tracks cleanly
   const stopCamera = useCallback(() => {
     try {
-      if (controlsRef.current) {
-        controlsRef.current.stop();
-        controlsRef.current = null;
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      if (videoRef.current) {
-        if (videoRef.current.srcObject) {
-          const stream = videoRef.current.srcObject;
-          stream.getTracks().forEach((track) => track.stop());
-          videoRef.current.srcObject = null;
-        }
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject;
+        stream.getTracks().forEach((track) => track.stop());
+        videoRef.current.srcObject = null;
       }
     } catch (e) {
       console.warn('Camera stop error:', e);
@@ -148,18 +146,18 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     [isProcessing, onBarcodeDetected, stopCamera, triggerSuccessFeedback]
   );
 
-  // Live Camera Stream Startup
+  // Ultra-resilient live camera start
   const startCamera = useCallback(
     async (deviceIdToUse = null) => {
-      // Check browser MediaDevices support
+      // 1. Verify Browser Support
       if (
         typeof navigator === 'undefined' ||
         !navigator.mediaDevices ||
         !navigator.mediaDevices.getUserMedia
       ) {
         setCameraError({
-          type: 'UNSUPPORTED',
-          message: 'Live camera streaming requires HTTPS or localhost (or camera permissions were blocked). On mobile over local Wi-Fi, tap "Snap Photo with Camera" below to scan instantly without HTTPS!'
+          title: 'Camera Not Available Over Plain HTTP',
+          message: 'Browsers block live video camera streaming over insecure Wi-Fi IP addresses. On mobile, please use the "Snap Photo to Scan" button below, or test via localhost on your laptop.'
         });
         return;
       }
@@ -170,49 +168,55 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       isScanningLocked.current = false;
 
       let stream = null;
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-      // Tier 1: Try requested device or high-res environment camera (ideal on mobile)
+      // 2. Obtain Media Stream
       try {
         const constraints = deviceIdToUse
           ? { video: { deviceId: { exact: deviceIdToUse } } }
-          : {
+          : isMobile
+          ? {
               video: {
                 facingMode: { ideal: 'environment' },
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                width: { ideal: 1280 }
               }
-            };
+            }
+          : { video: true };
+
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err1) {
-        console.warn('High-res environment camera request failed, falling back to generic video stream:', err1);
+        console.warn('Primary camera constraints failed, attempting fallback to generic video:', err1);
 
-        // Tier 2: Universal generic camera constraint (built-in webcam, desktop USB cameras)
         try {
+          // Fallback to basic generic video constraint
           stream = await navigator.mediaDevices.getUserMedia({ video: true });
         } catch (err2) {
           console.error('All camera requests failed:', err2);
-          let errorMsg = 'Could not access camera. Please allow camera permissions in your browser address bar.';
-          let errorType = 'UNKNOWN';
+          let title = 'Camera Access Blocked';
+          let message = 'Please grant camera access to scan barcodes.';
 
           if (err2.name === 'NotAllowedError' || err2.name === 'PermissionDeniedError') {
-            errorType = 'PERMISSION_DENIED';
-            errorMsg = 'Camera permission was denied. Click the lock/camera icon in your address bar to allow camera access, or use "Snap Photo with Camera" below.';
+            title = 'Permission Denied';
+            message = 'Click the lock or camera icon in your browser address bar at the top, switch Camera to "Allow", and then refresh the page.';
           } else if (err2.name === 'NotFoundError' || err2.name === 'DevicesNotFoundError') {
-            errorType = 'NOT_FOUND';
-            errorMsg = 'No camera hardware found on this computer. Use "Snap Photo with Camera" or enter the barcode manually.';
+            title = 'No Camera Hardware Detected';
+            message = 'No webcam or camera hardware was detected on this device. You can enter the barcode numbers manually below.';
           } else if (err2.name === 'NotReadableError' || err2.name === 'TrackStartError') {
-            errorType = 'IN_USE';
-            errorMsg = 'Your camera is in use by another program (Zoom, Meet, Teams). Please close other camera programs and try again.';
+            title = 'Camera Already In Use';
+            message = 'Another application (such as Zoom, Google Meet, or Teams) is currently using your webcam. Please close it and try again.';
+          } else {
+            message = `${err2.name}: ${err2.message}`;
           }
 
-          setCameraError({ type: errorType, message: errorMsg });
+          setCameraError({ title, message });
           setIsCameraActive(false);
           setCameraLoading(false);
           return;
         }
       }
 
-      if (!stream || !videoRef.current) {
+      const video = videoRef.current;
+      if (!stream || !video) {
         setCameraLoading(false);
         return;
       }
@@ -220,31 +224,23 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       streamRef.current = stream;
 
       try {
-        // Enumerate video devices now that camera access is granted
+        // Enumerate video devices
         try {
           const all = await navigator.mediaDevices.enumerateDevices();
           const vInputs = all.filter((d) => d.kind === 'videoinput');
           setVideoDevices(vInputs);
-        } catch (e) {
+        } catch {
           // ignore enumeration error
         }
 
         // Attach stream directly to video element
-        const video = videoRef.current;
         video.srcObject = stream;
         video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
         video.setAttribute('autoplay', 'true');
         video.muted = true;
 
-        try {
-          await video.play();
-        } catch (playErr) {
-          console.warn('Video auto-play interrupted:', playErr);
-        }
-
-        // Display video immediately
-        setIsCameraActive(true);
-        setCameraLoading(false);
+        await video.play();
 
         // Check torch capabilities
         const track = stream.getVideoTracks()[0];
@@ -258,32 +254,48 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
           }
         }
 
-        // Start ZXing real-time canvas frame decoder
-        const reader = new BrowserMultiFormatReader(getHints(), {
-          delayBetweenScanAttempts: 150,
-          delayBetweenScanSuccess: 1000
-        });
+        // Camera is visibly live!
+        setIsCameraActive(true);
+        setCameraLoading(false);
 
-        const controls = reader.scan(video, (result, error) => {
-          if (result && !isScanningLocked.current) {
-            const text = result.getText();
-            if (text) {
-              handleDetectedCode(text);
+        // Start high-performance frame capture loop
+        const reader = new BrowserMultiFormatReader(getHints());
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        scanIntervalRef.current = setInterval(() => {
+          if (
+            video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+            !isScanningLocked.current
+          ) {
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            try {
+              const result = reader.decodeFromCanvas(canvas);
+              if (result && result.getText()) {
+                handleDetectedCode(result.getText());
+              }
+            } catch {
+              // Frame without barcode; standard ZXing behavior
             }
           }
+        }, 180);
+      } catch (streamInitErr) {
+        console.error('Video play / frame loop error:', streamInitErr);
+        setCameraError({
+          title: 'Video Stream Error',
+          message: streamInitErr?.message || 'Failed to start video playback.'
         });
-
-        controlsRef.current = controls;
-      } catch (scanInitErr) {
-        console.error('Frame scanner initialization error:', scanInitErr);
-        setIsCameraActive(true);
+        setIsCameraActive(false);
         setCameraLoading(false);
       }
     },
     [getHints, handleDetectedCode, stopCamera]
   );
 
-  // Decode Barcode from Photo Snapshot or Upload (100% works on phones without HTTPS!)
+  // Decode Barcode from Photo Snapshot or File Upload
   const handlePhotoCapture = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -303,8 +315,8 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
           handleDetectedCode(result.getText());
           return;
         }
-      } catch (firstErr) {
-        // If initial decode failed, try with image element on canvas
+      } catch {
+        // Fallback: draw image to canvas with contrast enhancement
         const img = new Image();
         img.src = url;
         await new Promise((res, rej) => {
@@ -328,14 +340,13 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       }
 
       setCameraError({
-        type: 'NO_BARCODE_FOUND',
-        message: 'Could not read a barcode in that photo. Please take a clearer photo with the barcode centered and well-lit, or type the numbers manually below.'
+        title: 'No Barcode Found In Photo',
+        message: 'Could not read a barcode in that photo. Please take a closer photo with the barcode centered and well-lit, or type the numbers manually below.'
       });
-    } catch (err) {
-      console.warn('Photo barcode decode error:', err);
+    } catch {
       setCameraError({
-        type: 'DECODE_ERROR',
-        message: 'Could not detect a clear barcode stripe pattern. Please ensure good lighting or enter the numbers manually below.'
+        title: 'Photo Decode Error',
+        message: 'Could not read barcode from this image. Please ensure good lighting or enter the numbers manually below.'
       });
     } finally {
       setCameraLoading(false);
@@ -430,19 +441,19 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       {/* Live Video Viewfinder Card */}
       <Card className="relative overflow-hidden bg-berry-900 border-2 border-brand-border p-0 shadow-soft-xl rounded-3xl">
         <div className="relative aspect-[4/3] sm:aspect-[16/9] w-full bg-black flex items-center justify-center overflow-hidden">
-          {/* Native HTML5 Video Element */}
+          {/* Native HTML5 Video Element (ALWAYS RENDERED IN DOM) */}
           <video
             ref={videoRef}
-            className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
+            className="w-full h-full object-cover"
             playsInline
             muted
             autoPlay
           />
 
-          {/* Idle / Off Screen */}
+          {/* Idle Screen (Sits on top when camera is off) */}
           {!isCameraActive && !cameraLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-berry-900/95 to-berry/95 text-white space-y-5">
-              <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-warm">
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-berry-900/95 to-berry/95 text-white space-y-5 z-10">
+              <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-warm shadow-soft">
                 <Camera className="w-8 h-8" />
               </div>
               <div className="space-y-1 max-w-sm">
@@ -475,9 +486,16 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
                 </button>
               </div>
 
-              <div className="text-[11px] text-white/70">
-                💡 Mobile tip: If live streaming is restricted on local Wi-Fi, tap <strong>Snap Photo to Scan</strong> to open your phone camera directly!
-              </div>
+              {/* Error Notice if camera was blocked */}
+              {cameraError && (
+                <div className="max-w-md p-3.5 rounded-2xl bg-rose-950/90 border border-rose-500/50 text-left text-xs space-y-1 animate-fadeIn">
+                  <div className="flex items-center gap-2 text-rose-300 font-bold">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{cameraError.title}</span>
+                  </div>
+                  <p className="text-rose-100/90 leading-relaxed pl-6">{cameraError.message}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -486,7 +504,7 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-berry-900 text-white space-y-3 z-20">
               <RefreshCw className="w-8 h-8 text-vibrant animate-spin" />
               <span className="text-sm font-heading font-bold text-soft-pink">
-                Scanning barcode...
+                Connecting to camera...
               </span>
             </div>
           )}
@@ -554,34 +572,6 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
             </>
           )}
         </div>
-
-        {/* Camera Permission or Hardware Error Banner */}
-        {cameraError && (
-          <div className="p-4 bg-rose-950 text-rose-100 flex items-start gap-3 border-t border-rose-700 text-xs">
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-            <div className="space-y-1.5 flex-1">
-              <span className="font-bold block text-sm text-rose-200">Camera Notice:</span>
-              <p className="text-rose-200/90 leading-relaxed">{cameraError.message}</p>
-              <div className="pt-1 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-xl bg-vibrant hover:bg-vibrant-hover text-white font-heading font-bold text-xs inline-flex items-center gap-1.5"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Snap Photo with Camera</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startCamera()}
-                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-heading font-bold text-xs"
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Manual Barcode Input & Instant Validator Card */}
