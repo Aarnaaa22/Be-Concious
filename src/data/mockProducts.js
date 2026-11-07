@@ -318,11 +318,184 @@ export const mockProducts = [
   }
 ];
 
+// Dynamic in-memory / session cache for newly scanned or fetched products
+const dynamicProducts = new Map();
+
 export const getProductByBarcode = (barcode) => {
-  return mockProducts.find((p) => p.barcode === barcode.trim()) || null;
+  const code = barcode.trim();
+  if (dynamicProducts.has(code)) {
+    return dynamicProducts.get(code);
+  }
+  return mockProducts.find((p) => p.barcode === code) || null;
 };
 
 export const getProductById = (id) => {
+  // Check dynamic products first
+  for (const prod of dynamicProducts.values()) {
+    if (prod.id === id) return prod;
+  }
   return mockProducts.find((p) => p.id === id) || null;
 };
+
+export const registerDynamicProduct = (product) => {
+  if (product && product.barcode) {
+    dynamicProducts.set(product.barcode, product);
+    // Also save in sessionStorage for session persistence across page reloads
+    try {
+      sessionStorage.setItem(`prod_${product.id}`, JSON.stringify(product));
+    } catch (e) {
+      // ignore
+    }
+  }
+};
+
+// Async lookup that checks local benchmark items first, then real Open Food Facts API
+export const fetchProductByBarcode = async (barcode) => {
+  const code = barcode.trim();
+  
+  // 1. Check local catalog
+  const local = getProductByBarcode(code);
+  if (local) return local;
+
+  // Check sessionStorage
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith('prod_')) {
+        const item = JSON.parse(sessionStorage.getItem(key));
+        if (item && item.barcode === code) {
+          registerDynamicProduct(item);
+          return item;
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 2. Fetch from Open Food Facts API (real-world barcode resolution)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    if (data.status === 1 && data.product) {
+      const p = data.product;
+      const nutriments = p.nutriments || {};
+      
+      const calories100g = Math.round(nutriments['energy-kcal_100g'] || (nutriments['energy_100g'] ? nutriments['energy_100g'] / 4.184 : 0));
+      const servingSize = p.serving_size || '100g';
+      const servingMultiplier = parseFloat(servingSize) ? (parseFloat(servingSize) / 100) : 1;
+      const caloriesServing = Math.round(calories100g * servingMultiplier) || calories100g;
+
+      const nova = p.nova_group || 3;
+      const novaLabels = {
+        1: "Unprocessed or Minimally Processed",
+        2: "Processed Culinary Ingredients",
+        3: "Processed Foods",
+        4: "Ultra-Processed Food Formulation"
+      };
+
+      // Conscious score formula based on NOVA, sugars, fiber, and additives
+      let score = 75;
+      if (nova === 1) score += 18;
+      else if (nova === 2) score += 10;
+      else if (nova === 4) score -= 25;
+
+      const sugars = parseFloat(nutriments.sugars_100g || 0);
+      if (sugars > 15) score -= 12;
+      else if (sugars < 5) score += 5;
+
+      const additivesCount = Array.isArray(p.additives_tags) ? p.additives_tags.length : 0;
+      score -= additivesCount * 3;
+      score = Math.max(15, Math.min(98, Math.round(score)));
+
+      // Parse ingredients text
+      const ingredientsList = (p.ingredients_text || '')
+        .split(/[,;]/)
+        .map(i => i.trim())
+        .filter(i => i.length > 1 && i.length < 50)
+        .slice(0, 10)
+        .map(name => ({
+          name,
+          type: "ingredient",
+          isOrganic: name.toLowerCase().includes('organic') || name.toLowerCase().includes('bio')
+        }));
+
+      const allergens = (p.allergens_tags || [])
+        .map(a => a.replace(/^[a-z]{2}:/, '').replace(/-/g, ' '))
+        .filter(Boolean);
+
+      const parsedProduct = {
+        id: `off-${code}`,
+        barcode: code,
+        name: p.product_name || p.product_name_en || `Food Item (${code})`,
+        brand: p.brands || 'Packaged Grocery',
+        category: p.categories?.split(',')[0]?.trim() || 'Packaged Food',
+        servingSize: servingSize,
+        caloriesPerServing: caloriesServing,
+        caloriesPer100g: calories100g,
+        image: p.image_front_url || p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+        consciousScore: score,
+        novaGroup: nova,
+        novaLabel: novaLabels[nova] || "Processed Food",
+        nutriGrade: (p.nutriscore_grade || 'c').toUpperCase(),
+        summary: p.generic_name || `${p.product_name || 'Item'} with verified nutritional label from Open Food Facts database.`,
+        nutritionPer100g: {
+          calories: calories100g,
+          totalFat: parseFloat(nutriments.fat_100g || 0),
+          saturatedFat: parseFloat(nutriments['saturated-fat_100g'] || 0),
+          carbohydrates: parseFloat(nutriments.carbohydrates_100g || 0),
+          sugars: sugars,
+          fiber: parseFloat(nutriments.fiber_100g || 0),
+          protein: parseFloat(nutriments.proteins_100g || 0),
+          sodium: Math.round(parseFloat(nutriments.sodium_100g || 0) * 1000),
+        },
+        nutritionDailyPercent: {
+          fat: `${Math.round((nutriments.fat_100g || 0) / 70 * 100)}%`,
+          saturatedFat: `${Math.round((nutriments['saturated-fat_100g'] || 0) / 20 * 100)}%`,
+          carbs: `${Math.round((nutriments.carbohydrates_100g || 0) / 260 * 100)}%`,
+          sugars: `${Math.round((nutriments.sugars_100g || 0) / 50 * 100)}%`,
+          fiber: `${Math.round((nutriments.fiber_100g || 0) / 28 * 100)}%`,
+          protein: `${Math.round((nutriments.proteins_100g || 0) / 50 * 100)}%`,
+          sodium: `${Math.round((nutriments.sodium_100g || 0) / 2.3 * 100)}%`,
+        },
+        ingredients: ingredientsList.length > 0 ? ingredientsList : [
+          { name: "Declared package ingredients", type: "mixed", isOrganic: false }
+        ],
+        allergens: allergens.length > 0 ? allergens.map(a => `Contains ${a}`) : ["No common allergens declared"],
+        additives: (p.additives_tags || []).map(a => a.replace(/^[a-z]{2}:/, '').toUpperCase()),
+        processingDetails: {
+          novaRating: nova,
+          ultraProcessed: nova === 4,
+          preservativesCount: additivesCount,
+          artificialSweeteners: false,
+          hydrogenatedOils: false,
+          processingSummary: `NOVA Group ${nova}: ${novaLabels[nova]}. Evaluated according to international food processing standards.`,
+        },
+        tags: [
+          `NOVA ${nova}`,
+          nova === 4 ? "Ultra-Processed" : "Conscious Choice",
+          sugars < 5 ? "Low Sugar" : "Contains Sugars",
+          "Open Food Facts Verified"
+        ]
+      };
+
+      registerDynamicProduct(parsedProduct);
+      return parsedProduct;
+    }
+  } catch (err) {
+    console.warn("Could not query Open Food Facts API:", err);
+  }
+
+  return null;
+};
+
 
