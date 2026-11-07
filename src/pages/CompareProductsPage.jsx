@@ -25,6 +25,7 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge, NovaBadge, ConsciousScoreBadge } from '../components/common/Badge';
+import { NutritionTooltip } from '../components/common/NutritionTooltip';
 import { mockProducts, getProductByBarcode, fetchProductByBarcode } from '../data/mockProducts';
 import { useHistory } from '../context/HistoryContext';
 import { BetterAlternatives } from '../components/compare/BetterAlternatives';
@@ -242,7 +243,8 @@ export const CompareProductsPage = () => {
       val2: p2Nutr.sugars,
       isLowerBetter: true,
       format: (v) => v !== null && v !== undefined ? `${v} g` : '--',
-      goalLabel: 'Sugar Moderation'
+      goalLabel: 'Sugar Moderation',
+      termKey: 'sugars'
     },
     {
       label: 'Protein',
@@ -252,7 +254,8 @@ export const CompareProductsPage = () => {
       val2: p2Nutr.proteins !== undefined ? p2Nutr.proteins : p2Nutr.protein,
       isLowerBetter: false, // higher protein is typically advantageous
       format: (v) => v !== null && v !== undefined ? `${v} g` : '--',
-      goalLabel: 'Protein Goal'
+      goalLabel: 'Protein Goal',
+      termKey: 'protein'
     },
     {
       label: 'Total Fat',
@@ -272,7 +275,8 @@ export const CompareProductsPage = () => {
       val2: p2Nutr.saturatedFat,
       isLowerBetter: true,
       format: (v) => v !== null && v !== undefined ? `${v} g` : '--',
-      goalLabel: 'Heart-Conscious Fat'
+      goalLabel: 'Heart-Conscious Fat',
+      termKey: 'saturatedFat'
     },
     {
       label: 'Fibre',
@@ -282,7 +286,8 @@ export const CompareProductsPage = () => {
       val2: p2Nutr.fiber,
       isLowerBetter: false,
       format: (v) => v !== null && v !== undefined ? `${v} g` : '--',
-      goalLabel: 'Digestive Health'
+      goalLabel: 'Digestive Health',
+      termKey: 'fiber'
     },
     {
       label: 'Sodium',
@@ -292,7 +297,8 @@ export const CompareProductsPage = () => {
       val2: p2Nutr.sodium,
       isLowerBetter: true,
       format: (v) => v !== null && v !== undefined ? `${Math.round(v)} mg` : '--',
-      goalLabel: 'Low Sodium'
+      goalLabel: 'Low Sodium',
+      termKey: 'sodium'
     }
   ];
 
@@ -698,8 +704,11 @@ export const CompareProductsPage = () => {
                     <div className="w-7 h-7 rounded-lg bg-brand-bg border border-[#EFE4EB] flex items-center justify-center text-vibrant flex-shrink-0">
                       <RowIcon className="w-3.5 h-3.5" />
                     </div>
-                    <div>
-                      <span>{row.label}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span>{row.label}</span>
+                        {row.termKey && <NutritionTooltip termKey={row.termKey} iconOnly />}
+                      </div>
                       {row.goalLabel && (
                         <span className="hidden sm:block text-[10px] font-medium text-brand-muted">
                           {row.goalLabel}

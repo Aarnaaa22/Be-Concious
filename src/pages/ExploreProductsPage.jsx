@@ -22,6 +22,7 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge, NovaBadge, ConsciousScoreBadge } from '../components/common/Badge';
+import { ProductCardSkeleton } from '../components/common/SkeletonLoader';
 import { mockProducts, registerDynamicProduct } from '../data/mockProducts';
 import { searchOpenFoodFacts } from '../services/openFoodFactsService';
 import { useHistory } from '../context/HistoryContext';
@@ -269,6 +270,17 @@ export const ExploreProductsPage = () => {
           <p className="text-xs font-semibold">
             {dbError} You can still browse our local verified collection.
           </p>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SKELETON LOADER GRID WHEN SEARCHING DATABASE                              */}
+      {/* ========================================================================= */}
+      {isSearchingDb && filteredProducts.length === 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <ProductCardSkeleton key={i} />
+          ))}
         </div>
       )}
 

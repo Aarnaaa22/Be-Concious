@@ -34,6 +34,8 @@ import {
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge, NovaBadge, ConsciousScoreBadge } from '../components/common/Badge';
+import { NutritionTooltip } from '../components/common/NutritionTooltip';
+import { ProductAnalysisSkeleton } from '../components/common/SkeletonLoader';
 import { IngredientDetective } from '../components/product/IngredientDetective';
 import { BetterAlternatives } from '../components/compare/BetterAlternatives';
 import { mockProducts, getProductById, getProductByBarcode, fetchProductByBarcode } from '../data/mockProducts';
@@ -125,22 +127,18 @@ export const ProductAnalysisPage = () => {
   };
 
   // =========================================================================
-  // LOADING STATE
+  // LOADING STATE (Shimmer Skeleton Loader)
   // =========================================================================
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
-        <div className="w-16 h-16 rounded-3xl bg-warm-light border border-warm flex items-center justify-center mx-auto text-berry shadow-soft animate-pulse">
-          <Loader2 className="w-8 h-8 text-vibrant animate-spin" />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8 animate-fadeIn">
+        <div className="flex items-center justify-between pb-2">
+          <div className="flex items-center gap-2 text-xs font-heading font-bold text-berry">
+            <Loader2 className="w-4 h-4 text-vibrant animate-spin" />
+            <span>Connecting to Open Food Facts database...</span>
+          </div>
         </div>
-        <div className="space-y-1">
-          <h2 className="text-2xl font-heading font-extrabold text-berry">
-            Loading Food Intelligence...
-          </h2>
-          <p className="text-sm text-brand-muted">
-            Validating real nutritional facts and processing insights...
-          </p>
-        </div>
+        <ProductAnalysisSkeleton />
       </div>
     );
   }
@@ -599,7 +597,10 @@ export const ProductAnalysisPage = () => {
               <span className="text-xs font-heading font-bold uppercase tracking-wider text-brand-muted">
                 Official Standard
               </span>
-              <Award className="w-4 h-4 text-vibrant" />
+              <div className="flex items-center gap-1">
+                <NutritionTooltip termKey="nutriScore" iconOnly />
+                <Award className="w-4 h-4 text-vibrant" />
+              </div>
             </div>
             <h3 className="text-lg font-heading font-bold text-berry">
               Nutri-Score Indicator
@@ -626,7 +627,10 @@ export const ProductAnalysisPage = () => {
               <span className="text-xs font-heading font-bold uppercase tracking-wider text-brand-muted">
                 Scientific Index
               </span>
-              <Layers className="w-4 h-4 text-berry" />
+              <div className="flex items-center gap-1">
+                <NutritionTooltip termKey="nova" iconOnly />
+                <Layers className="w-4 h-4 text-berry" />
+              </div>
             </div>
             <h3 className="text-lg font-heading font-bold text-berry">
               NOVA Processing Group
@@ -654,7 +658,10 @@ export const ProductAnalysisPage = () => {
               <span className="text-xs font-heading font-bold uppercase tracking-wider text-brand-muted">
                 Holistic Reference
               </span>
-              <Sparkles className="w-4 h-4 text-vibrant" />
+              <div className="flex items-center gap-1">
+                <NutritionTooltip termKey="consciousScore" iconOnly />
+                <Sparkles className="w-4 h-4 text-vibrant" />
+              </div>
             </div>
             <h3 className="text-lg font-heading font-bold text-berry">
               Conscious Balance Score
@@ -793,7 +800,10 @@ export const ProductAnalysisPage = () => {
             {/* 3. Sugars */}
             <div className="pt-3 space-y-1.5 pl-3 border-l-2 border-warm">
               <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-brand-muted">↳ of which Sugars</span>
+                <span className="text-brand-muted flex items-center gap-1">
+                  <span>↳ of which Sugars</span>
+                  <NutritionTooltip termKey="sugars" iconOnly />
+                </span>
                 <span className="font-heading font-bold text-berry">
                   {currentNutrients.sugars !== null ? `${currentNutrients.sugars} g` : 'Not declared'}
                 </span>
@@ -825,7 +835,10 @@ export const ProductAnalysisPage = () => {
             {/* 5. Saturated Fat */}
             <div className="pt-3 space-y-1.5 pl-3 border-l-2 border-soft">
               <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-brand-muted">↳ of which Saturated Fat</span>
+                <span className="text-brand-muted flex items-center gap-1">
+                  <span>↳ of which Saturated Fat</span>
+                  <NutritionTooltip termKey="saturatedFat" iconOnly />
+                </span>
                 <span className="font-heading font-bold text-berry">
                   {currentNutrients.saturatedFat !== null ? `${currentNutrients.saturatedFat} g` : 'Not declared'}
                 </span>
@@ -841,7 +854,10 @@ export const ProductAnalysisPage = () => {
             {/* 6. Fibre */}
             <div className="pt-3 space-y-1.5">
               <div className="flex justify-between items-center text-sm font-semibold">
-                <span className="text-brand-text">Dietary Fibre</span>
+                <span className="text-brand-text flex items-center gap-1">
+                  <span>Dietary Fibre</span>
+                  <NutritionTooltip termKey="fiber" iconOnly />
+                </span>
                 <span className="font-heading font-bold text-berry">
                   {currentNutrients.fiber !== null ? `${currentNutrients.fiber} g` : 'Not declared'}
                 </span>
@@ -857,7 +873,10 @@ export const ProductAnalysisPage = () => {
             {/* 7. Protein */}
             <div className="pt-3 space-y-1.5">
               <div className="flex justify-between items-center text-sm font-semibold">
-                <span className="text-brand-text">Protein</span>
+                <span className="text-brand-text flex items-center gap-1">
+                  <span>Protein</span>
+                  <NutritionTooltip termKey="protein" iconOnly />
+                </span>
                 <span className="font-heading font-bold text-berry">
                   {currentNutrients.proteins !== null ? `${currentNutrients.proteins} g` : (currentNutrients.protein !== null ? `${currentNutrients.protein} g` : 'Not declared')}
                 </span>
@@ -874,7 +893,10 @@ export const ProductAnalysisPage = () => {
             <div className="pt-3 space-y-1.5">
               <div className="flex justify-between items-center text-sm font-semibold">
                 <div>
-                  <span className="text-brand-text">Salt</span>
+                  <span className="text-brand-text flex items-center gap-1">
+                    <span>Salt & Sodium</span>
+                    <NutritionTooltip termKey="sodium" iconOnly />
+                  </span>
                   {currentNutrients.sodium !== null && (
                     <span className="block text-xs font-normal text-brand-muted">
                       Sodium: {currentNutrients.sodium} g

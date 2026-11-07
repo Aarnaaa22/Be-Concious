@@ -82,3 +82,52 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #D9A8CA;
 }
+
+/* Accessible visible focus ring for keyboard navigation */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(246, 36, 119, 0.35), 0 0 0 1px #92003A;
+  border-radius: 0.5rem;
+}
+
+/* Skeleton Shimmer Effect */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #F7EDF3;
+}
+.skeleton-shimmer::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.5) 20%,
+    rgba(255, 255, 255, 0.8) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.8s infinite;
+  content: '';
+}
+
+/* Reduced Motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton-shimmer::after {
+    animation: none;
+  }
+}

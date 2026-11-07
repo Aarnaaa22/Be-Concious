@@ -26,7 +26,7 @@ export function App() {
     <div className="min-h-screen flex flex-col bg-brand-bg text-brand-text">
       <ScrollToTop />
       <Navbar />
-      <main className="flex-grow">
+      <main className="flex-grow pb-24 md:pb-0">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/scan" element={<ScanFoodPage />} />

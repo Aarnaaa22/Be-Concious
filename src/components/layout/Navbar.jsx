@@ -9,7 +9,8 @@ import {
   Menu, 
   X, 
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  Scale
 } from 'lucide-react';
 import { Button } from '../common/Button';
 
@@ -179,23 +180,25 @@ export const Navbar = () => {
           </Link>
 
           <Link
+            to="/compare"
+            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
+              location.pathname === '/compare' ? 'text-berry font-extrabold' : 'text-brand-muted hover:text-berry'
+            }`}
+            aria-label="Compare Foods"
+          >
+            <Scale className="w-5 h-5" />
+            <span className="text-[10px] font-heading mt-0.5">Compare</span>
+          </Link>
+
+          <Link
             to="/history"
             className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
               location.pathname === '/history' ? 'text-berry font-extrabold' : 'text-brand-muted hover:text-berry'
             }`}
+            aria-label="My Scan History"
           >
             <Clock className="w-5 h-5" />
             <span className="text-[10px] font-heading mt-0.5">History</span>
-          </Link>
-
-          <Link
-            to="/about"
-            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
-              location.pathname === '/about' ? 'text-berry font-extrabold' : 'text-brand-muted hover:text-berry'
-            }`}
-          >
-            <Info className="w-5 h-5" />
-            <span className="text-[10px] font-heading mt-0.5">About</span>
           </Link>
 
         </div>

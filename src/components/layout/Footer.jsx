@@ -58,6 +58,11 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/compare" className="text-brand-muted hover:text-vibrant transition-colors">
+                  Compare Products
+                </Link>
+              </li>
+              <li>
                 <Link to="/history" className="text-brand-muted hover:text-vibrant transition-colors">
                   My Scan History
                 </Link>
