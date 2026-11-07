@@ -8,16 +8,21 @@ import {
   Info, 
   Menu, 
   X, 
-  ArrowUpRight,
-  Sparkles,
-  Scale
+  ArrowUpRight, 
+  Sparkles, 
+  Scale, 
+  User, 
+  LogOut, 
+  Sliders, 
+  LayoutDashboard 
 } from 'lucide-react';
-import { Button } from '../common/Button';
+import { useAuth } from '../../context/AuthContext';
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const { user, profile, signOut } = useAuth();
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -25,8 +30,11 @@ export const Navbar = () => {
     { name: 'Compare', path: '/compare' },
     { name: 'Explore Catalog', path: '/explore' },
     { name: 'My History', path: '/history' },
+    ...(user ? [{ name: 'Dashboard', path: '/dashboard' }] : []),
     { name: 'About Mission', path: '/about' },
   ];
+
+  const userName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account';
 
   return (
     <>
@@ -91,7 +99,7 @@ export const Navbar = () => {
                   <NavLink
                     key={link.path}
                     to={link.path}
-                    className={`px-4 py-2 rounded-xl text-xs font-heading font-bold transition-all duration-200 ${
+                    className={`px-3.5 py-2 rounded-xl text-xs font-heading font-bold transition-all duration-200 ${
                       isActive
                         ? 'text-white bg-[#92003A] border border-[#FFE185]/40 shadow-md'
                         : 'text-white/85 hover:text-white hover:bg-white/15'
@@ -105,7 +113,7 @@ export const Navbar = () => {
                 <NavLink
                   key={link.path}
                   to={link.path}
-                  className={`px-4 py-2 rounded-xl text-xs font-heading font-bold transition-all duration-200 ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-heading font-bold transition-all duration-200 ${
                     isActive
                       ? 'text-white bg-berry shadow-soft'
                       : 'text-brand-text hover:text-berry hover:bg-soft-light'
@@ -119,6 +127,38 @@ export const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="hidden sm:flex items-center gap-3">
+            
+            {/* Authenticated User Pill OR Sign In Link */}
+            {user ? (
+              <Link
+                to="/dashboard"
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border font-heading font-bold text-xs transition-all ${
+                  isHome
+                    ? 'bg-white/20 border-white/30 text-white hover:bg-white/30'
+                    : 'bg-[#FFFAFC] border-[#EAE0E6] text-berry hover:border-berry'
+                }`}
+                title="View Dashboard"
+              >
+                <div className="w-6 h-6 rounded-lg bg-warm text-berry flex items-center justify-center font-black text-xs">
+                  {userName.charAt(0).toUpperCase()}
+                </div>
+                <span className="max-w-[100px] truncate">{userName.split(' ')[0]}</span>
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-heading font-bold text-xs sm:text-sm transition-all ${
+                  isHome
+                    ? 'text-white hover:bg-white/15 border border-white/30'
+                    : 'text-berry hover:bg-soft-light border border-[#EAE0E6]'
+                }`}
+              >
+                <User className="w-4 h-4" />
+                <span>Sign In</span>
+              </Link>
+            )}
+
+            {/* Scan Barcode Primary CTA */}
             <Link
               to="/scan"
               className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-heading font-extrabold text-xs sm:text-sm active:scale-95 transition-all ${
@@ -154,6 +194,7 @@ export const Navbar = () => {
             }`}>
               Navigate
             </div>
+            
             {navLinks.map((link) => {
               const isActive = location.pathname === link.path;
               return (
@@ -163,8 +204,8 @@ export const Navbar = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-heading font-bold transition-all ${
                     isActive
-                      ? 'bg-berry text-white'
-                      : 'text-brand-text hover:bg-soft-light'
+                      ? (isHome ? 'bg-white/20 text-white' : 'bg-berry text-white')
+                      : (isHome ? 'text-white/80 hover:bg-white/10' : 'text-brand-text hover:bg-soft-light')
                   }`}
                 >
                   <span>{link.name}</span>
@@ -172,6 +213,39 @@ export const Navbar = () => {
                 </Link>
               );
             })}
+
+            {/* Mobile Auth Button */}
+            <div className="pt-2 border-t border-white/10">
+              {user ? (
+                <div className="space-y-2">
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-warm/30 text-white font-heading font-bold text-sm"
+                  >
+                    <span>Signed in as {userName}</span>
+                    <LayoutDashboard className="w-4 h-4" />
+                  </Link>
+                  <button
+                    onClick={() => { signOut(); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-white/10 text-white font-bold text-xs"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-white text-berry font-heading font-bold text-sm shadow-soft"
+                >
+                  <User className="w-4 h-4 text-berry" />
+                  <span>Sign In / Create Account</span>
+                </Link>
+              )}
+            </div>
+
             <div className="pt-2">
               <Link
                 to="/scan"
@@ -226,17 +300,6 @@ export const Navbar = () => {
           </Link>
 
           <Link
-            to="/compare"
-            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
-              location.pathname === '/compare' ? 'text-berry font-extrabold' : 'text-brand-muted hover:text-berry'
-            }`}
-            aria-label="Compare Foods"
-          >
-            <Scale className="w-5 h-5" />
-            <span className="text-[10px] font-heading mt-0.5">Compare</span>
-          </Link>
-
-          <Link
             to="/history"
             className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
               location.pathname === '/history' ? 'text-berry font-extrabold' : 'text-brand-muted hover:text-berry'
@@ -245,6 +308,19 @@ export const Navbar = () => {
           >
             <Clock className="w-5 h-5" />
             <span className="text-[10px] font-heading mt-0.5">History</span>
+          </Link>
+
+          <Link
+            to={user ? "/dashboard" : "/login"}
+            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
+              location.pathname === '/dashboard' || location.pathname === '/login' 
+                ? 'text-berry font-extrabold' 
+                : 'text-brand-muted hover:text-berry'
+            }`}
+            aria-label={user ? "My Dashboard" : "Sign In"}
+          >
+            <User className="w-5 h-5" />
+            <span className="text-[10px] font-heading mt-0.5">{user ? 'Me' : 'Login'}</span>
           </Link>
 
         </div>

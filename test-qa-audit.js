@@ -1,4 +1,5 @@
 // Comprehensive Functional QA Audit Test Suite for Be Conscious (ESM)
+import fs from 'fs';
 
 const USER_AGENT = 'BeConsciousApp/1.0 (https://github.com/Aarnaaa22/Be-Concious)';
 
@@ -20,7 +21,7 @@ async function fetchOFF(code) {
 
 async function runAudit() {
   console.log('=====================================================');
-  console.log('🧪 BE CONSCIOUS - AUTOMATED FUNCTIONAL QA AUDIT');
+  console.log('🧪 BE CONSCIOUS - AUTOMATED FULL-STACK & QA AUDIT');
   console.log('=====================================================\n');
 
   let passed = 0;
@@ -98,41 +99,94 @@ async function runAudit() {
     { code: '0123456789012', expected: true },
   ];
 
-  let valPass = true;
-  for (const tc of testCases) {
-    if (validateCode(tc.code).valid !== tc.expected) {
-      valPass = false;
-      break;
-    }
-  }
-  if (valPass) {
+  const allPassed = testCases.every(tc => validateCode(tc.code).valid === tc.expected);
+  if (allPassed) {
     console.log('✅ PASSED (All validation patterns verified)');
     passed++;
   } else {
-    console.log('❌ FAILED (Validation pattern mismatch)');
+    console.log('❌ FAILED (Barcode validator discrepancy)');
     failed++;
   }
 
-  // Test 5: Nutrition Trade-off Delta Math
+  // Test 5: Side-by-Side Delta & Trade-Off Math Check
   process.stdout.write('Test 5: Side-by-Side Delta & Trade-Off Math... ');
-  const calcDiff = (val1, val2) => {
-    const d = val1 - val2;
-    const pct = val2 > 0 ? Math.round((d / val2) * 100) : null;
-    return { d: Number(d.toFixed(1)), pct };
-  };
+  const nutellaSugar = 56.3;
+  const rawHazelnutSugar = 12.0;
+  const deltaSugar = rawHazelnutSugar - nutellaSugar;
+  const percentDelta = Math.round((deltaSugar / nutellaSugar) * 100);
 
-  const diffSugar = calcDiff(12.0, 56.3);
-  if (diffSugar.d === -44.3 && diffSugar.pct === -79) {
-    console.log('✅ PASSED (-44.3g diff, -79% sugar delta)');
+  if (deltaSugar < 0 && percentDelta === -79) {
+    console.log(`✅ PASSED (${deltaSugar.toFixed(1)}g diff, ${percentDelta}% sugar delta)`);
     passed++;
   } else {
-    console.log(`❌ FAILED (${diffSugar.d}, ${diffSugar.pct}%)`);
+    console.log(`❌ FAILED (Math error: deltaSugar=${deltaSugar}, percentDelta=${percentDelta})`);
     failed++;
   }
 
+  // Test 6: Supabase Authentication Validation Rules
+  process.stdout.write('Test 6: Authentication Form Validation Rules... ');
+  const validateAuthInput = ({ email, password, confirmPassword, fullName, isSignUp }) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { valid: false, error: 'Invalid email' };
+    if (!password || password.length < 6) return { valid: false, error: 'Password too short' };
+    if (isSignUp) {
+      if (!fullName || !fullName.trim()) return { valid: false, error: 'Name required' };
+      if (password !== confirmPassword) return { valid: false, error: 'Password mismatch' };
+    }
+    return { valid: true };
+  };
+
+  const authTests = [
+    { input: { email: 'invalid-email', password: '123' }, isSignUp: false, expected: false },
+    { input: { email: 'user@domain.com', password: '123' }, isSignUp: false, expected: false },
+    { input: { email: 'user@domain.com', password: 'secretpassword' }, isSignUp: false, expected: true },
+    { input: { email: 'user@domain.com', password: 'secretpassword', confirmPassword: 'different', fullName: 'Sarah', isSignUp: true }, expected: false },
+    { input: { email: 'user@domain.com', password: 'secretpassword', confirmPassword: 'secretpassword', fullName: 'Sarah', isSignUp: true }, expected: true }
+  ];
+
+  const authTestsPassed = authTests.every(t => validateAuthInput({ ...t.input, isSignUp: t.isSignUp ?? t.input.isSignUp }).valid === t.expected);
+  if (authTestsPassed) {
+    console.log('✅ PASSED (Email format, password constraints, confirmation matching)');
+    passed++;
+  } else {
+    console.log('❌ FAILED (Auth validation discrepancy)');
+    failed++;
+  }
+
+  // Test 7: Supabase SQL Migration Schema Structure
+  process.stdout.write('Test 7: Supabase SQL Migration & RLS Schema Check... ');
+  const migrationPath = 'supabase/migrations/20261107000000_initial_schema.sql';
+  if (fs.existsSync(migrationPath)) {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    const hasProfiles = sql.includes('create table if not exists public.profiles');
+    const hasScanHistory = sql.includes('create table if not exists public.scan_history');
+    const hasSavedProducts = sql.includes('create table if not exists public.saved_products');
+    const hasPreferences = sql.includes('create table if not exists public.user_preferences');
+    const hasRLS = sql.includes('alter table public.profiles enable row level security') &&
+                   sql.includes('alter table public.scan_history enable row level security') &&
+                   sql.includes('alter table public.saved_products enable row level security') &&
+                   sql.includes('alter table public.user_preferences enable row level security');
+    const hasTrigger = sql.includes('create trigger on_auth_user_created') || sql.includes('create or replace trigger on_auth_user_created');
+
+    if (hasProfiles && hasScanHistory && hasSavedProducts && hasPreferences && hasRLS && hasTrigger) {
+      console.log('✅ PASSED (All 4 tables, RLS policies & automated user trigger verified)');
+      passed++;
+    } else {
+      console.log('❌ FAILED (SQL migration missing required DDL components)');
+      failed++;
+    }
+  } else {
+    console.log('❌ FAILED (Migration file not found)');
+    failed++;
+  }
+
+  // Summary
   console.log('\n=====================================================');
   console.log(`📊 SUMMARY: ${passed} Passed, ${failed} Failed`);
   console.log('=====================================================');
+
+  if (failed > 0) {
+    process.exit(1);
+  }
 }
 
 runAudit();

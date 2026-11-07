@@ -9,6 +9,10 @@ import { ExploreProductsPage } from './pages/ExploreProductsPage';
 import { CompareProductsPage } from './pages/CompareProductsPage';
 import { MyHistoryPage } from './pages/MyHistoryPage';
 import { AboutPage } from './pages/AboutPage';
+import { AuthPage } from './pages/AuthPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -39,6 +43,22 @@ export function App() {
           <Route path="/explore" element={<ExploreProductsPage />} />
           <Route path="/history" element={<MyHistoryPage />} />
           <Route path="/about" element={<AboutPage />} />
+          
+          {/* Authentication & User Account Routes */}
+          <Route path="/login" element={<AuthPage initialMode="login" />} />
+          <Route path="/signup" element={<AuthPage initialMode="signup" />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          
+          {/* Protected Routes */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>
@@ -48,4 +68,3 @@ export function App() {
 }
 
 export default App;
-

@@ -40,11 +40,14 @@ import { IngredientDetective } from '../components/product/IngredientDetective';
 import { BetterAlternatives } from '../components/compare/BetterAlternatives';
 import { mockProducts, getProductById, getProductByBarcode, fetchProductByBarcode } from '../data/mockProducts';
 import { useHistory } from '../context/HistoryContext';
+import { useAuth } from '../context/AuthContext';
 
 export const ProductAnalysisPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { isSaved, toggleSaveProduct, addToHistory, history } = useHistory();
+  const { user } = useAuth();
+  const [showAuthHint, setShowAuthHint] = useState(false);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -393,7 +396,13 @@ export const ProductAnalysisPage = () => {
               <div className="flex flex-wrap items-center gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => toggleSaveProduct(product)}
+                  onClick={() => {
+                    toggleSaveProduct(product);
+                    if (!user && !saved) {
+                      setShowAuthHint(true);
+                      setTimeout(() => setShowAuthHint(false), 6000);
+                    }
+                  }}
                   className={`px-5 py-3 rounded-2xl font-heading text-sm font-bold border transition-all flex items-center gap-2 shadow-soft ${
                     saved 
                       ? 'bg-berry text-white border-berry shadow-soft-md' 
@@ -423,6 +432,20 @@ export const ProductAnalysisPage = () => {
                   Compare Products
                 </Button>
               </div>
+
+              {/* Anonymous Save Prompt to Log In */}
+              {showAuthHint && !user && (
+                <div className="mt-2 p-3.5 rounded-2xl bg-warm/30 border border-warm/80 text-xs text-berry font-medium flex items-center justify-between gap-3 animate-fadeIn">
+                  <span>✨ Saved to this device! Want your favourites saved permanently to the cloud?</span>
+                  <Link 
+                    to="/login" 
+                    state={{ from: { pathname: `/analysis/${product.barcode || product.id}` } }}
+                    className="px-3 py-1 rounded-xl bg-berry text-white font-heading font-bold text-[11px] uppercase tracking-wider shrink-0 hover:bg-berry/90"
+                  >
+                    Sign In →
+                  </Link>
+                </div>
+              )}
 
             </div>
 

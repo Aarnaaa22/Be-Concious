@@ -21,8 +21,10 @@ import {
 import { Button } from '../components/common/Button';
 import { Badge, NovaBadge, ConsciousScoreBadge } from '../components/common/Badge';
 import { useHistory } from '../context/HistoryContext';
+import { useAuth } from '../context/AuthContext';
 
 export const MyHistoryPage = () => {
+  const { user } = useAuth();
   const {
     history,
     savedProducts,
@@ -133,6 +135,25 @@ export const MyHistoryPage = () => {
           </Button>
         </div>
       </div>
+
+      {/* Cloud Sync Prompt for Anonymous Users */}
+      {!user && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-soft/30 via-warm/30 to-soft/30 border border-berry/20 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3 text-xs sm:text-sm text-berry font-medium">
+            <Sparkles className="w-5 h-5 text-vibrant shrink-0" />
+            <span>
+              Currently viewing anonymous local device data. <strong className="font-bold">Sign in to save your history permanently</strong> and sync across all devices.
+            </span>
+          </div>
+          <Link
+            to="/login"
+            state={{ from: { pathname: '/history' } }}
+            className="px-4 py-2 rounded-xl bg-berry text-white font-heading font-bold text-xs uppercase tracking-wider hover:bg-berry/90 transition-all shrink-0"
+          >
+            Sign In / Create Account →
+          </Link>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* TABS & SEARCH BAR                                                         */}
