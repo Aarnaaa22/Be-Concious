@@ -1,7 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const getEnvVar = (key) => {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    return import.meta.env[key];
+  }
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key];
+  }
+  return '';
+};
+
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
 // Check if actual Supabase credentials are provided (not default placeholders)
 export const isSupabaseConfigured = () => {
@@ -15,6 +25,14 @@ export const isSupabaseConfigured = () => {
   );
 };
 
+// Safe storage reference
+const getStorage = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return window.localStorage;
+  }
+  return undefined;
+};
+
 // Create a single supabase client for interacting with the database
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
@@ -24,7 +42,7 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storage: window.localStorage
+      storage: getStorage()
     }
   }
 );

@@ -38,6 +38,7 @@ import { NutritionTooltip } from '../components/common/NutritionTooltip';
 import { ProductAnalysisSkeleton } from '../components/common/SkeletonLoader';
 import { IngredientDetective } from '../components/product/IngredientDetective';
 import { BetterAlternatives } from '../components/compare/BetterAlternatives';
+import { ProductFallbackFlow } from '../components/scanner/ProductFallbackFlow';
 import { mockProducts, getProductById, getProductByBarcode, fetchProductByBarcode } from '../data/mockProducts';
 import { useHistory } from '../context/HistoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -147,58 +148,15 @@ export const ProductAnalysisPage = () => {
   }
 
   // =========================================================================
-  // MISSING PRODUCT ERROR STATE
+  // MISSING PRODUCT INTELLIGENT FALLBACK FLOW (OCR + PACKAGING CAPTURE)
   // =========================================================================
   if (errorState === 'NOT_FOUND' || !product) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
-        <Card className="bg-white border border-brand-border p-8 sm:p-12 space-y-6 shadow-soft-lg">
-          <div className="w-20 h-20 rounded-3xl bg-warm-light border border-warm flex items-center justify-center mx-auto text-berry">
-            <Package className="w-10 h-10 text-vibrant" />
-          </div>
-
-          <div className="space-y-2">
-            <Badge variant="soft" size="md">
-              Barcode Not Found
-            </Badge>
-            <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-berry">
-              Oops! We couldn't find this product.
-            </h1>
-            <p className="text-sm text-brand-muted max-w-md mx-auto leading-relaxed">
-              This barcode is not registered in the Open Food Facts global database or our local catalog.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Button
-              to="/scan"
-              variant="primary"
-              size="md"
-              icon={ScanLine}
-              className="w-full sm:w-auto shadow-vibrant-glow"
-            >
-              Scan Again
-            </Button>
-            <Button
-              to="/scan"
-              variant="secondary"
-              size="md"
-              icon={RefreshCw}
-              className="w-full sm:w-auto"
-            >
-              Enter Another Barcode
-            </Button>
-            <Button
-              to="/explore"
-              variant="outline"
-              size="md"
-              icon={Search}
-              className="w-full sm:w-auto"
-            >
-              Search by Product Name
-            </Button>
-          </div>
-        </Card>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fadeIn">
+        <ProductFallbackFlow
+          barcode={productId?.replace(/^off-/, '')}
+          onCancel={() => navigate('/scan')}
+        />
       </div>
     );
   }
@@ -369,6 +327,19 @@ export const ProductAnalysisPage = () => {
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-berry leading-tight">
                 {product.name}
               </h1>
+
+              {/* Community Contributed / OCR Status Banner */}
+              {(product.isUserSubmitted || product.verificationStatus === 'unverified') && (
+                <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900 animate-fadeIn">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold">Community-Submitted / Package-Extracted Data</span>
+                    <p className="text-amber-800/90 leading-relaxed">
+                      These values were captured from package photographs via camera OCR or community submission. Pending laboratory confirmation.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <p className="text-sm sm:text-base text-brand-muted leading-relaxed">
                 {product.summary}

@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 
 /**
  * ============================================================================
@@ -477,6 +477,105 @@ export const supabaseService = {
     } catch (err) {
       console.error('Error removing saved product:', err.message);
       return { error: err };
+    }
+  },
+
+  // ==========================================================================
+  // 5. COMMUNITY PRODUCT DATABASE & CACHING
+  // ==========================================================================
+
+  /**
+   * Lookup product in public.products by barcode
+   */
+  async getProductByBarcode(barcode) {
+    if (!isSupabaseConfigured() || !barcode) return { data: null, error: null };
+
+    try {
+      const clean = String(barcode).trim();
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('barcode', clean)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return { data: null, error: null };
+
+      // Normalize into client product structure
+      const normalized = {
+        id: data.id,
+        barcode: data.barcode,
+        name: data.product_name,
+        brand: data.brand || 'Unbranded',
+        category: data.category || 'Packaged Grocery',
+        image: data.product_image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+        hasRealImage: !!data.product_image,
+        consciousScore: data.conscious_score || 65,
+        novaGroup: data.nova_group,
+        nutriGrade: data.nutri_grade,
+        servingSize: data.serving_size,
+        summary: data.summary || `${data.product_name} (${data.brand})`,
+        nutritionPer100g: data.nutritional_values?.per100g || data.nutritional_values || {},
+        nutritionPerServing: data.nutritional_values?.perServing || { hasServingData: false },
+        ingredients: data.ingredients || [],
+        dataSource: data.data_source || 'community',
+        verificationStatus: data.verification_status || 'unverified',
+        isUserSubmitted: data.verification_status !== 'verified',
+        lastUpdated: data.last_updated
+      };
+
+      return { data: normalized, error: null };
+    } catch (err) {
+      console.warn('Supabase product lookup failed:', err.message);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Submit community or OCR-extracted product to public.products
+   */
+  async submitCommunityProduct(product, userId = null) {
+    if (!isSupabaseConfigured() || !product || !product.barcode) {
+      return { data: null, error: new Error('Supabase not configured or missing barcode') };
+    }
+
+    try {
+      const clean = String(product.barcode).trim();
+      const id = product.id || `custom-${clean}-${Date.now()}`;
+      const record = {
+        id,
+        barcode: clean,
+        product_name: product.name || product.product_name || `Product ${clean}`,
+        brand: product.brand || 'Unbranded',
+        category: product.category || 'Packaged Grocery',
+        product_image: product.image || null,
+        ingredients: product.ingredients || [],
+        nutritional_values: {
+          per100g: product.nutritionPer100g || {},
+          perServing: product.nutritionPerServing || {}
+        },
+        serving_size: product.servingSize || null,
+        conscious_score: product.consciousScore || 65,
+        nova_group: product.novaGroup || null,
+        nutri_grade: product.nutriGrade || null,
+        summary: product.summary || `Community submitted product for ${product.name}`,
+        data_source: product.dataSource || 'community',
+        verification_status: product.verificationStatus || 'unverified',
+        submitted_by: userId || null,
+        last_updated: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('products')
+        .upsert(record, { onConflict: 'barcode' })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (err) {
+      console.error('Error submitting community product:', err.message);
+      return { data: null, error: err };
     }
   }
 };

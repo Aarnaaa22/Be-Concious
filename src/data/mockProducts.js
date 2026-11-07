@@ -1,5 +1,7 @@
 // Real-world benchmark food items based on Open Food Facts & standard nutritional tables
-import { fetchProductFromOpenFoodFacts, normalizeProduct, fetchCategoryAlternatives, evaluateGoalTradeoffs } from '../services/openFoodFactsService';
+import { fetchProductFromOpenFoodFacts, normalizeProduct, fetchCategoryAlternatives, evaluateGoalTradeoffs } from '../services/openFoodFactsService.js';
+import { findInIndianCatalog, indianProductsCatalog } from './indianProductsCatalog.js';
+import { lookupProduct } from '../services/productLookupService.js';
 
 export const mockProducts = [
   {
@@ -443,6 +445,10 @@ export const getProductByBarcode = (barcode) => {
   if (dynamicProducts.has(code)) {
     return dynamicProducts.get(code);
   }
+  // Check Indian catalog
+  const indian = findInIndianCatalog(code);
+  if (indian) return indian;
+
   return mockProducts.find((p) => p.barcode === code) || null;
 };
 
@@ -451,6 +457,10 @@ export const getProductById = (id) => {
   if (dynamicProducts.has(id)) {
     return dynamicProducts.get(id);
   }
+  // Check Indian catalog by id or barcode
+  const indian = indianProductsCatalog.find((p) => p.id === id || p.barcode === id);
+  if (indian) return indian;
+
   const fromMock = mockProducts.find((p) => p.id === id);
   if (fromMock) return fromMock;
 
@@ -468,25 +478,35 @@ export const getProductById = (id) => {
   return null;
 };
 
-// Unified async lookup: Checks local catalog first, then calls Open Food Facts API v3
+// Unified async lookup: Multi-source pipeline with Indian FMCG catalog, Open Food Facts, Supabase, and GS1 fallback
 export const fetchProductByBarcode = async (barcode) => {
   const code = (barcode || '').trim();
   if (!code) {
     return { found: false, error: 'INVALID_BARCODE', message: 'Barcode is empty.' };
   }
 
-  // 1. Check local benchmark items
-  const local = getProductByBarcode(code);
-  if (local) {
-    return { found: true, product: local, fromCache: true };
-  }
-
-  // 2. Fetch from Open Food Facts API v3
-  const res = await fetchProductFromOpenFoodFacts(code);
+  // Delegate to modular multi-source lookup service
+  const res = await lookupProduct(code);
   if (res.found && res.product) {
     registerDynamicProduct(res.product);
+    return {
+      found: true,
+      product: res.product,
+      source: res.source,
+      verificationStatus: res.verificationStatus,
+      status: res.status
+    };
   }
-  return res;
+
+  return {
+    found: false,
+    error: 'NOT_FOUND',
+    status: res.status,
+    barcode: code,
+    format: res.format,
+    gs1Info: res.gs1Info,
+    message: res.message
+  };
 };
 
 // Find verified alternatives in the same category from database
