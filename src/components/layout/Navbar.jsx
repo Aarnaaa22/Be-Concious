@@ -20,6 +20,7 @@ export const Navbar = () => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Scan Food', path: '/scan' },
+    { name: 'Compare', path: '/compare' },
     { name: 'Explore Catalog', path: '/explore' },
     { name: 'My History', path: '/history' },
     { name: 'About Mission', path: '/about' },

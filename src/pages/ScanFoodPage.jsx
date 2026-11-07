@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
-import { 
-  ScanLine, 
-  Search, 
-  Camera, 
-  CameraOff, 
-  RefreshCw, 
-  AlertCircle, 
-  CheckCircle2, 
-  Sparkles, 
-  Lightbulb, 
-  ShieldAlert, 
-  Loader2, 
+import {
+  ScanLine,
+  Search,
+  Camera,
+  CameraOff,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
+  Lightbulb,
+  ShieldAlert,
+  Loader2,
   ArrowRight,
-  SwitchCamera
+  SwitchCamera,
+  Scale
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
@@ -38,7 +39,7 @@ export const ScanFoodPage = () => {
   const [cameraError, setCameraError] = useState(null);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
-  
+
   // Barcode decoding & manual input states
   const [manualBarcode, setManualBarcode] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -171,9 +172,9 @@ export const ScanFoodPage = () => {
       let targetDeviceId = deviceIdToUse || selectedDeviceId;
       if (!targetDeviceId && devices.length > 0) {
         // Look for rear/environment camera
-        const backCamera = devices.find(d => 
-          d.label.toLowerCase().includes('back') || 
-          d.label.toLowerCase().includes('rear') || 
+        const backCamera = devices.find(d =>
+          d.label.toLowerCase().includes('back') ||
+          d.label.toLowerCase().includes('rear') ||
           d.label.toLowerCase().includes('environment')
         );
         targetDeviceId = backCamera ? backCamera.deviceId : devices[0].deviceId;
@@ -296,7 +297,7 @@ export const ScanFoodPage = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-      
+
       {/* Page Header (Exact requested typography & copy) */}
       <div className="text-center max-w-2xl mx-auto space-y-2">
         <span className="text-xs font-heading font-extrabold text-vibrant uppercase tracking-wider">
@@ -311,13 +312,13 @@ export const ScanFoodPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
+
         {/* ========================================================================= */}
         {/* LEFT COLUMN: LIVE SCANNER CARD                                            */}
         {/* ========================================================================= */}
         <div className="lg:col-span-7">
           <div className="paper-card rounded-3xl p-6 sm:p-8 space-y-6">
-            
+
             {/* Header & Controls Status */}
             <div className="flex items-center justify-between pb-3 border-b border-[#EFE4EB]">
               <div className="flex items-center gap-2">
@@ -342,7 +343,7 @@ export const ScanFoodPage = () => {
 
             {/* Live Camera Viewfinder Box */}
             <div className="relative aspect-[4/3] rounded-3xl bg-berry-dark overflow-hidden flex flex-col items-center justify-center border-2 border-[#EFE4EB]">
-              
+
               {/* Actual HTML5 Video Stream for ZXing */}
               <video
                 ref={videoRef}
@@ -354,13 +355,13 @@ export const ScanFoodPage = () => {
               {/* Viewfinder Overlay When Camera is Active */}
               {isCameraActive && (
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
-                  
+
                   {/* Subtle dark vignette to guide focus */}
                   <div className="absolute inset-0 bg-black/35" />
 
                   {/* Scanning Target Frame with Vibrant Pink border */}
                   <div className="relative w-72 h-44 border-2 border-vibrant/90 rounded-2xl flex items-center justify-center shadow-vibrant-glow overflow-hidden z-10">
-                    
+
                     {/* Frame corner highlights */}
                     <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-white -mt-0.5 -ml-0.5 rounded-tl" />
                     <div className="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-white -mt-0.5 -mr-0.5 rounded-tr" />
@@ -505,7 +506,7 @@ export const ScanFoodPage = () => {
         {/* RIGHT COLUMN: MANUAL ENTRY FALLBACK & SAMPLES                             */}
         {/* ========================================================================= */}
         <div className="lg:col-span-5 space-y-6">
-          
+
           {/* Manual Barcode Entry Card */}
           <Card className="bg-white border border-brand-border p-6 sm:p-7 space-y-4 shadow-soft">
             <div>
@@ -595,10 +596,10 @@ export const ScanFoodPage = () => {
                   className="w-full text-left p-3 rounded-2xl bg-brand-bg hover:bg-soft-light border border-brand-border hover:border-vibrant/40 transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3">
-                    <img 
-                      src={item.image} 
-                      alt={item.name} 
-                      className="w-10 h-10 rounded-xl object-cover border border-brand-border flex-shrink-0" 
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-10 h-10 rounded-xl object-cover border border-brand-border flex-shrink-0"
                     />
                     <div>
                       <h4 className="text-xs font-heading font-bold text-brand-text group-hover:text-berry line-clamp-1">
@@ -666,6 +667,24 @@ export const ScanFoodPage = () => {
               </button>
             </div>
           </Card>
+
+          {/* Side-by-Side Comparison Callout */}
+          <div className="p-5 rounded-3xl bg-warm-light/60 border border-warm/80 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2 text-berry">
+              <Scale className="w-5 h-5 text-berry flex-shrink-0" />
+              <h4 className="font-heading font-extrabold text-sm">Compare Before You Choose</h4>
+            </div>
+            <p className="text-xs text-brand-muted leading-relaxed">
+              Deciding between two snacks in the grocery aisle? Compare calories, sugar, protein, and NOVA processing side-by-side with verified per-100g values.
+            </p>
+            <Link
+              to="/compare"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-berry text-white font-heading font-bold text-xs hover:bg-berry/95 shadow-soft transition-all"
+            >
+              <span>Launch Product Comparison</span>
+              <ArrowRight className="w-3.5 h-3.5 text-warm" />
+            </Link>
+          </div>
 
           {/* Browser Camera Permissions Guide Card */}
           <Card className="bg-soft-light/80 border border-soft-border/60 p-5 space-y-2.5">

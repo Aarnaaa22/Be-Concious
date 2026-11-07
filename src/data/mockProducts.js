@@ -1,5 +1,5 @@
 // Real-world benchmark food items based on Open Food Facts & standard nutritional tables
-import { fetchProductFromOpenFoodFacts, normalizeProduct } from '../services/openFoodFactsService';
+import { fetchProductFromOpenFoodFacts, normalizeProduct, fetchCategoryAlternatives, evaluateGoalTradeoffs } from '../services/openFoodFactsService';
 
 export const mockProducts = [
   {
@@ -488,3 +488,10 @@ export const fetchProductByBarcode = async (barcode) => {
   }
   return res;
 };
+
+// Find verified alternatives in the same category from database
+export const fetchAlternativesForProduct = async (product) => {
+  return await fetchCategoryAlternatives(product, mockProducts);
+};
+
+export { evaluateGoalTradeoffs };

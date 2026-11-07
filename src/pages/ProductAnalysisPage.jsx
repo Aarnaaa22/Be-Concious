@@ -35,6 +35,7 @@ import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge, NovaBadge, ConsciousScoreBadge } from '../components/common/Badge';
 import { IngredientDetective } from '../components/product/IngredientDetective';
+import { BetterAlternatives } from '../components/compare/BetterAlternatives';
 import { mockProducts, getProductById, getProductByBarcode, fetchProductByBarcode } from '../data/mockProducts';
 import { useHistory } from '../context/HistoryContext';
 
@@ -415,14 +416,14 @@ export const ProductAnalysisPage = () => {
                   Scan Another
                 </Button>
 
-                <button
-                  type="button"
-                  onClick={() => setIsCompareOpen(true)}
-                  className="px-5 py-3 rounded-2xl font-heading text-sm font-bold bg-brand-bg hover:bg-soft-light border border-brand-border text-berry transition-colors flex items-center gap-2"
+                <Button
+                  to={`/compare?b1=${encodeURIComponent(product.barcode || product.id)}`}
+                  variant="secondary"
+                  size="md"
+                  icon={BarChart2}
                 >
-                  <BarChart2 className="w-4 h-4 text-vibrant" />
-                  <span>Compare Products</span>
-                </button>
+                  Compare Products
+                </Button>
               </div>
 
             </div>
@@ -949,6 +950,17 @@ export const ProductAnalysisPage = () => {
 
 
       {/* ========================================================================= */}
+      {/* SECTION 6.5: BETTER ALTERNATIVES                                          */}
+      {/* ========================================================================= */}
+      <BetterAlternatives
+        product={product}
+        onSelectAlternative={(alt) => {
+          navigate(`/compare?b1=${encodeURIComponent(product.barcode || product.id)}&b2=${encodeURIComponent(alt.barcode || alt.id)}`);
+        }}
+      />
+
+
+      {/* ========================================================================= */}
       {/* SECTION 7: ACTIONS                                                        */}
       {/* ========================================================================= */}
       <section className="p-8 sm:p-10 rounded-3xl bg-warm-light border border-warm/80 text-center space-y-6 shadow-soft">
@@ -975,14 +987,14 @@ export const ProductAnalysisPage = () => {
             <span>{saved ? 'Saved in My Foods' : 'Save Product'}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsCompareOpen(true)}
-            className="px-6 py-3.5 rounded-2xl font-heading text-sm font-bold bg-white text-berry border border-brand-border hover:bg-soft-light shadow-soft transition-all flex items-center gap-2"
+          <Button
+            to={`/compare?b1=${encodeURIComponent(product.barcode || product.id)}`}
+            variant="secondary"
+            size="md"
+            icon={BarChart2}
           >
-            <BarChart2 className="w-4 h-4 text-vibrant" />
-            <span>Compare Products</span>
-          </button>
+            Compare Products
+          </Button>
 
           <Button
             to="/scan"

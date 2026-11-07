@@ -22,7 +22,7 @@ export function normalizeProduct(raw) {
   const productName = p.product_name || p.product_name_en || null;
   const brand = p.brands || p.brand_owner || null;
   const quantity = p.quantity || null;
-  
+
   // Serving Size Data
   const servingSize = p.serving_size || null;
   const servingQuantity = p.serving_quantity ? Number(p.serving_quantity) : null;
@@ -32,7 +32,7 @@ export function normalizeProduct(raw) {
   const category = p.categories ? p.categories.split(',')[0].trim() : null;
 
   // Images (prefer high-res front, fallback to thumb/image_url)
-  const image = 
+  const image =
     p.selected_images?.front?.display?.en ||
     p.selected_images?.front?.display?.fr ||
     p.image_front_url ||
@@ -145,7 +145,7 @@ export function normalizeProduct(raw) {
     novaGroup,
     nutriGrade: nutriScore,
     summary: p.generic_name || `${productName || 'Food Item'} verified in Open Food Facts database.`,
-    
+
     // Per 100g Nutritional Values (Preserving units)
     nutritionPer100g: {
       calories: calories100g,
@@ -288,10 +288,262 @@ export async function fetchProductFromOpenFoodFacts(barcode) {
   return {
     found: false,
     error: 'NETWORK_ERROR',
-    message: lastError?.name === 'AbortError' 
-      ? 'Request timed out connecting to food database.' 
+    message: lastError?.name === 'AbortError'
+      ? 'Request timed out connecting to food database.'
       : 'Network connection failed while querying Open Food Facts.',
     barcode: code,
   };
+}
+
+/**
+ * Searches Open Food Facts by keyword/terms
+ */
+export async function searchOpenFoodFacts(query, limit = 8) {
+  const q = (query || '').trim();
+  if (!q) return [];
+
+  const proxyUrl = `/off-api/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=${limit}`;
+  const directUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=${limit}`;
+
+  for (const url of [proxyUrl, directUrl]) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': USER_AGENT,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.products)) {
+          return data.products
+            .map(normalizeProduct)
+            .filter(p => p && p.name && p.nutritionPer100g?.calories !== null);
+        }
+      }
+    } catch {
+      // try next
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Evaluates why an alternative product might be preferable for particular nutritional goals.
+ * Does NOT claim that one product is universally healthier than another.
+ */
+export function evaluateGoalTradeoffs(candidate, reference) {
+  if (!candidate || !reference) return [];
+
+  const cNutr = candidate.nutritionPer100g || {};
+  const rNutr = reference.nutritionPer100g || {};
+  const goals = [];
+
+  // 1. Lower Sugar Goal
+  if (
+    cNutr.sugars !== null &&
+    rNutr.sugars !== null &&
+    cNutr.sugars < rNutr.sugars - 1.5
+  ) {
+    const diff = (rNutr.sugars - cNutr.sugars).toFixed(1);
+    const pct = rNutr.sugars > 0 ? Math.round(((rNutr.sugars - cNutr.sugars) / rNutr.sugars) * 100) : null;
+    goals.push({
+      goal: 'Lower Sugar',
+      title: 'Sugar Moderation',
+      summary: `~${diff}g less sugar per 100g (${cNutr.sugars}g vs ${rNutr.sugars}g${pct ? `, -${pct}%` : ''}).`,
+      explanation: 'Helpful for those moderating added sugars or managing blood glucose swings.',
+      type: 'sugar',
+      favorableFor: 'low-sugar'
+    });
+  }
+
+  // 2. Higher Protein Goal
+  if (
+    cNutr.proteins !== null &&
+    rNutr.proteins !== null &&
+    cNutr.proteins > rNutr.proteins + 1.5
+  ) {
+    const diff = (cNutr.proteins - rNutr.proteins).toFixed(1);
+    goals.push({
+      goal: 'Higher Protein',
+      title: 'Protein Density',
+      summary: `+${diff}g more protein per 100g (${cNutr.proteins}g vs ${rNutr.proteins}g).`,
+      explanation: 'Supports satiety, active recovery, and daily macronutrient requirements.',
+      type: 'protein',
+      favorableFor: 'high-protein'
+    });
+  }
+
+  // 3. Higher Fibre Goal
+  if (
+    cNutr.fiber !== null &&
+    rNutr.fiber !== null &&
+    cNutr.fiber > rNutr.fiber + 1.5
+  ) {
+    const diff = (cNutr.fiber - rNutr.fiber).toFixed(1);
+    goals.push({
+      goal: 'Higher Dietary Fibre',
+      title: 'Digestive Fibre',
+      summary: `+${diff}g more fibre per 100g (${cNutr.fiber}g vs ${rNutr.fiber}g).`,
+      explanation: 'Supports gut microbiome diversity and promotes steady digestion.',
+      type: 'fiber',
+      favorableFor: 'high-fiber'
+    });
+  }
+
+  // 4. Lower Saturated Fat Goal
+  if (
+    cNutr.saturatedFat !== null &&
+    rNutr.saturatedFat !== null &&
+    cNutr.saturatedFat < rNutr.saturatedFat - 1.5
+  ) {
+    const diff = (rNutr.saturatedFat - cNutr.saturatedFat).toFixed(1);
+    goals.push({
+      goal: 'Lower Saturated Fat',
+      title: 'Heart-Conscious Fat Profile',
+      summary: `~${diff}g less saturated fat per 100g (${cNutr.saturatedFat}g vs ${rNutr.saturatedFat}g).`,
+      explanation: 'Prefers unsaturated plant oils or leaner ingredients to support cardiovascular dietary guidelines.',
+      type: 'fat',
+      favorableFor: 'low-sat-fat'
+    });
+  }
+
+  // 5. Lower Sodium Goal
+  if (
+    cNutr.sodium !== null &&
+    rNutr.sodium !== null &&
+    cNutr.sodium < rNutr.sodium - 80
+  ) {
+    const diff = Math.round(rNutr.sodium - cNutr.sodium);
+    goals.push({
+      goal: 'Lower Sodium',
+      title: 'Sodium Moderation',
+      summary: `~${diff}mg less sodium per 100g (${Math.round(cNutr.sodium)}mg vs ${Math.round(rNutr.sodium)}mg).`,
+      explanation: 'Favorable for individuals following low-salt cardiovascular or blood pressure regimens.',
+      type: 'sodium',
+      favorableFor: 'low-sodium'
+    });
+  }
+
+  // 6. Lower Industrial Processing Goal (NOVA)
+  if (
+    candidate.novaGroup &&
+    reference.novaGroup &&
+    candidate.novaGroup < reference.novaGroup
+  ) {
+    goals.push({
+      goal: 'Less Industrially Processed',
+      title: 'Whole Food Formulation',
+      summary: `NOVA Group ${candidate.novaGroup} (compared to Group ${reference.novaGroup}).`,
+      explanation: 'Crafted with fewer industrial fractionated isolates and minimal mechanical or chemical modification.',
+      type: 'nova',
+      favorableFor: 'whole-food'
+    });
+  }
+
+  // 7. Clean Formulation / Zero Additives
+  const cAdditives = candidate.additives?.length || 0;
+  const rAdditives = reference.additives?.length || 0;
+  if (cAdditives === 0 && rAdditives > 0) {
+    goals.push({
+      goal: 'Zero Additives Detected',
+      title: 'Additive-Free Recipe',
+      summary: `0 chemical additives (vs ${rAdditives} in compared item).`,
+      explanation: 'Contains no synthetic emulsifiers, artificial colorings, or chemical preservatives.',
+      type: 'additives',
+      favorableFor: 'clean-label'
+    });
+  }
+
+  return goals;
+}
+
+/**
+ * Searches the available product database for similar products within a relevant food category.
+ * Only returns verified products with goal-based explanations.
+ * If none qualify, returns an empty array.
+ */
+export async function fetchCategoryAlternatives(referenceProduct, localCatalog = []) {
+  if (!referenceProduct) return [];
+
+  const currentBarcode = referenceProduct.barcode || '';
+  const currentCategory = (referenceProduct.category || '').toLowerCase();
+  const currentName = (referenceProduct.name || '').toLowerCase();
+
+  // Extract a sensible search keyword based on category and product name
+  let keyword = 'snack';
+  if (currentCategory.includes('cereal') || currentCategory.includes('breakfast') || currentName.includes('granola') || currentName.includes('oat')) {
+    keyword = 'granola oats cereal';
+  } else if (currentCategory.includes('beverage') || currentCategory.includes('drink') || currentName.includes('soda') || currentName.includes('tea') || currentName.includes('juice')) {
+    keyword = 'tea juice sparkling beverage';
+  } else if (currentCategory.includes('dairy') || currentCategory.includes('yogurt') || currentName.includes('yogurt') || currentName.includes('milk')) {
+    keyword = 'yogurt milk';
+  } else if (currentCategory.includes('spread') || currentName.includes('butter') || currentName.includes('nutella') || currentName.includes('hazelnut')) {
+    keyword = 'spread hazelnut peanut butter';
+  } else if (currentCategory.includes('snack') || currentName.includes('cracker') || currentName.includes('chip') || currentName.includes('puff')) {
+    keyword = 'crackers biscuit organic snack';
+  } else if (referenceProduct.category && referenceProduct.category !== 'Packaged Grocery') {
+    keyword = referenceProduct.category.split(',')[0].trim();
+  }
+
+  // 1. Gather candidates from local catalog
+  const localCandidates = localCatalog.filter(p => {
+    if (!p || p.barcode === currentBarcode) return false;
+    const catMatch = p.category && referenceProduct.category && (
+      p.category.toLowerCase().includes(currentCategory) ||
+      currentCategory.includes(p.category.toLowerCase())
+    );
+    const tagMatch = Array.isArray(p.tags) && p.tags.some(t => currentCategory.includes(t.toLowerCase()));
+    return catMatch || tagMatch;
+  });
+
+  // 2. Fetch candidates from Open Food Facts database
+  let remoteCandidates = [];
+  try {
+    const searchTerms = keyword.split(' ')[0] || keyword;
+    remoteCandidates = await searchOpenFoodFacts(searchTerms, 8);
+  } catch {
+    remoteCandidates = [];
+  }
+
+  // 3. Merge, deduplicate by barcode, and filter verified products
+  const pool = [...localCandidates, ...remoteCandidates];
+  const seenBarcodes = new Set([currentBarcode]);
+  const verifiedAlternatives = [];
+
+  for (const item of pool) {
+    if (!item || !item.barcode || seenBarcodes.has(item.barcode)) continue;
+    seenBarcodes.add(item.barcode);
+
+    // Verify product has essential nutritional values
+    const nutr = item.nutritionPer100g || {};
+    const hasNutritionalData = 
+      nutr.calories !== null && 
+      (nutr.sugars !== null || nutr.proteins !== null || nutr.fat !== null);
+
+    if (!hasNutritionalData) continue;
+
+    // Evaluate nutritional goal trade-offs
+    const goalReasons = evaluateGoalTradeoffs(item, referenceProduct);
+
+    // Only include if at least 1 genuine goal-based reason applies
+    if (goalReasons.length > 0) {
+      verifiedAlternatives.push({
+        ...item,
+        goalReasons,
+      });
+    }
+  }
+
+  // Return list of verified alternatives (empty if none qualify)
+  return verifiedAlternatives;
 }
 

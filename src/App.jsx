@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage';
 import { ScanFoodPage } from './pages/ScanFoodPage';
 import { ProductAnalysisPage } from './pages/ProductAnalysisPage';
 import { ExploreProductsPage } from './pages/ExploreProductsPage';
+import { CompareProductsPage } from './pages/CompareProductsPage';
 import { MyHistoryPage } from './pages/MyHistoryPage';
 import { AboutPage } from './pages/AboutPage';
 
@@ -31,6 +32,7 @@ export function App() {
           <Route path="/scan" element={<ScanFoodPage />} />
           <Route path="/analysis" element={<ProductAnalysisPage />} />
           <Route path="/analysis/:productId" element={<ProductAnalysisPage />} />
+          <Route path="/compare" element={<CompareProductsPage />} />
           <Route path="/explore" element={<ExploreProductsPage />} />
           <Route path="/history" element={<MyHistoryPage />} />
           <Route path="/about" element={<AboutPage />} />
