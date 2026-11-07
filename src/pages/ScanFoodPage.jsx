@@ -80,6 +80,31 @@ export const ScanFoodPage = () => {
     }
   }, []);
 
+  // Audio chime feedback on successful barcode scan
+  const playScanChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // Note A5
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.1); // Note E6
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {
+      // AudioContext not permitted or muted; ignore silently
+    }
+  }, []);
+
   // Handle successful barcode detection
   const handleBarcodeDetected = useCallback(async (barcodeText) => {
     if (isProcessingScan.current) return;
@@ -87,6 +112,7 @@ export const ScanFoodPage = () => {
     if (!cleanCode) return;
 
     isProcessingScan.current = true;
+    playScanChime();
     setLastScannedCode(cleanCode);
     setIsLookingUp(true);
     setValidationError('');
@@ -95,22 +121,20 @@ export const ScanFoodPage = () => {
     stopCamera();
 
     try {
-      // Lookup product (local catalog + Open Food Facts API fallback)
-      const product = await fetchProductByBarcode(cleanCode);
+      // Lookup product (local catalog + Open Food Facts API v3)
+      const res = await fetchProductByBarcode(cleanCode);
 
-      if (product) {
-        addToHistory(product);
-        navigate(`/analysis/${product.id}`);
+      if (res && res.found && res.product) {
+        addToHistory(res.product);
+        navigate(`/analysis/${res.product.id}`);
       } else {
-        setValidationError(
-          `Detected barcode "${cleanCode}", but no nutritional record was found. You can try one of the verified sample foods below or search by name in Explore.`
-        );
-        setIsLookingUp(false);
-        isProcessingScan.current = false;
+        // Navigate to missing product error page with required guidance
+        navigate(`/analysis/${cleanCode}`);
       }
     } catch (err) {
       console.error('Error during product lookup:', err);
-      setValidationError('Network lookup failed. Please check your connection or test a sample item.');
+      navigate(`/analysis/${cleanCode}`);
+    } finally {
       setIsLookingUp(false);
       isProcessingScan.current = false;
     }
@@ -249,18 +273,16 @@ export const ScanFoodPage = () => {
     setIsLookingUp(true);
 
     try {
-      const product = await fetchProductByBarcode(clean);
-      if (product) {
-        addToHistory(product);
-        navigate(`/analysis/${product.id}`);
+      const res = await fetchProductByBarcode(clean);
+      if (res && res.found && res.product) {
+        addToHistory(res.product);
+        navigate(`/analysis/${res.product.id}`);
       } else {
-        setValidationError(
-          `Barcode "${clean}" was not found in our conscious database or Open Food Facts. Please check the digits or test one of our verified sample products below.`
-        );
-        setIsLookingUp(false);
+        navigate(`/analysis/${clean}`);
       }
     } catch (err) {
-      setValidationError('Lookup failed. Please check your network connection.');
+      navigate(`/analysis/${clean}`);
+    } finally {
       setIsLookingUp(false);
     }
   };
@@ -561,11 +583,11 @@ export const ScanFoodPage = () => {
             </div>
 
             <p className="text-xs text-brand-muted">
-              Tap any food item to simulate an immediate scan without needing a camera:
+              Tap any food item to simulate an immediate scan or test live Open Food Facts barcodes:
             </p>
 
             <div className="space-y-2">
-              {mockProducts.slice(0, 4).map((item) => (
+              {mockProducts.slice(0, 3).map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -583,7 +605,7 @@ export const ScanFoodPage = () => {
                         {item.name}
                       </h4>
                       <span className="text-[10px] font-mono text-brand-muted">
-                        {item.barcode}
+                        {item.barcode} • Benchmark Item
                       </span>
                     </div>
                   </div>
@@ -591,6 +613,57 @@ export const ScanFoodPage = () => {
                   <ArrowRight className="w-4 h-4 text-vibrant group-hover:translate-x-1 transition-transform flex-shrink-0 ml-2" />
                 </button>
               ))}
+
+              {/* Real Open Food Facts Live Barcode Shortcuts */}
+              <button
+                type="button"
+                onClick={() => {
+                  setManualBarcode('5449000000996');
+                  navigate('/analysis/5449000000996');
+                }}
+                className="w-full text-left p-3 rounded-2xl bg-warm-light/60 hover:bg-warm-light border border-warm/80 transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-berry text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    OFF
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-heading font-bold text-brand-text group-hover:text-berry line-clamp-1">
+                      Coca-Cola Original 330ml
+                    </h4>
+                    <span className="text-[10px] font-mono text-brand-muted">
+                      5449000000996 • Real Open Food Facts v3
+                    </span>
+                  </div>
+                </div>
+
+                <ArrowRight className="w-4 h-4 text-vibrant group-hover:translate-x-1 transition-transform flex-shrink-0 ml-2" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setManualBarcode('3017620422003');
+                  navigate('/analysis/3017620422003');
+                }}
+                className="w-full text-left p-3 rounded-2xl bg-warm-light/60 hover:bg-warm-light border border-warm/80 transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-berry text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    OFF
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-heading font-bold text-brand-text group-hover:text-berry line-clamp-1">
+                      Nutella Hazelnut Spread (400g)
+                    </h4>
+                    <span className="text-[10px] font-mono text-brand-muted">
+                      3017620422003 • Real Open Food Facts v3
+                    </span>
+                  </div>
+                </div>
+
+                <ArrowRight className="w-4 h-4 text-vibrant group-hover:translate-x-1 transition-transform flex-shrink-0 ml-2" />
+              </button>
             </div>
           </Card>
 
