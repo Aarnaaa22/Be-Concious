@@ -22,11 +22,14 @@ function ScrollToTop() {
 }
 
 export function App() {
+  const { pathname } = useLocation();
+  const isHome = pathname === '/';
+
   return (
-    <div className="min-h-screen flex flex-col bg-brand-bg text-brand-text">
+    <div className={`min-h-screen flex flex-col ${isHome ? 'bg-[#F62477]' : 'bg-brand-bg'} text-brand-text`}>
       <ScrollToTop />
       <Navbar />
-      <main className="flex-grow pb-24 md:pb-0">
+      <main className={`flex-grow ${isHome ? 'pb-0' : 'pb-24 md:pb-0'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/scan" element={<ScanFoodPage />} />
@@ -39,7 +42,7 @@ export function App() {
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>
-      <Footer />
+      {!isHome && <Footer />}
     </div>
   );
 }
