@@ -12,7 +12,8 @@ import {
   ScanLine,
   CheckCircle2,
   Search,
-  Sparkles,
+  Upload,
+  Image as ImageIcon,
   Info
 } from 'lucide-react';
 import { Button } from '../common/Button';
@@ -29,7 +30,8 @@ import { scanLogger } from '../../utils/scanLogger';
 export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
-  const readerRef = useRef(null);
+  const streamRef = useRef(null);
+  const fileInputRef = useRef(null);
   const isScanningLocked = useRef(false);
 
   // Camera Hardware States
@@ -68,12 +70,16 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
         controlsRef.current.stop();
         controlsRef.current = null;
       }
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject;
-        stream.getTracks().forEach((track) => {
-          track.stop();
-        });
-        videoRef.current.srcObject = null;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        if (videoRef.current.srcObject) {
+          const stream = videoRef.current.srcObject;
+          stream.getTracks().forEach((track) => track.stop());
+          videoRef.current.srcObject = null;
+        }
       }
     } catch (e) {
       console.warn('Camera stop error:', e);
@@ -85,7 +91,7 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     }
   }, []);
 
-  // Audio & Haptic Chime
+  // Audio & Haptic Feedback
   const triggerSuccessFeedback = useCallback(() => {
     try {
       if (navigator.vibrate) {
@@ -98,8 +104,8 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // Note A5
-      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.1); // Note E6
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.1);
 
       gain.gain.setValueAtTime(0.2, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
@@ -113,7 +119,7 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     }
   }, []);
 
-  // Dispatch detected barcode with debounce
+  // Dispatch detected barcode with cooldown
   const handleDetectedCode = useCallback(
     (codeText) => {
       if (isScanningLocked.current || isProcessing) return;
@@ -129,15 +135,12 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
         action: 'BARCODE_DECODED',
         source: 'ZXING_CAMERA_SCANNER',
         status: 'SUCCESS',
-        message: `Successfully read barcode ${clean}`
+        message: `Successfully decoded barcode ${clean}`
       });
 
-      // Stop camera stream cleanly
       stopCamera();
-
       onBarcodeDetected(clean);
 
-      // Unlock after cooldown
       setTimeout(() => {
         isScanningLocked.current = false;
       }, 2500);
@@ -145,13 +148,18 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     [isProcessing, onBarcodeDetected, stopCamera, triggerSuccessFeedback]
   );
 
-  // Start live camera stream with universal mobile & desktop fallback
+  // Live Camera Stream Startup
   const startCamera = useCallback(
     async (deviceIdToUse = null) => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      // Check browser MediaDevices support
+      if (
+        typeof navigator === 'undefined' ||
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
         setCameraError({
           type: 'UNSUPPORTED',
-          message: 'Camera API is not supported in this browser. Please ensure HTTPS or localhost is active, or use manual input below.'
+          message: 'Live camera streaming requires HTTPS or localhost (or camera permissions were blocked). On mobile over local Wi-Fi, tap "Snap Photo with Camera" below to scan instantly without HTTPS!'
         });
         return;
       }
@@ -163,7 +171,7 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
 
       let stream = null;
 
-      // 1. Primary Attempt: Environment facingMode with HD constraints (great for mobile)
+      // Tier 1: Try requested device or high-res environment camera (ideal on mobile)
       try {
         const constraints = deviceIdToUse
           ? { video: { deviceId: { exact: deviceIdToUse } } }
@@ -176,25 +184,25 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
             };
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err1) {
-        console.warn('Initial camera constraints failed, attempting generic webcam fallback:', err1);
+        console.warn('High-res environment camera request failed, falling back to generic video stream:', err1);
 
-        // 2. Secondary Fallback: Universal generic video constraint (laptop webcams, desktop USB cameras)
+        // Tier 2: Universal generic camera constraint (built-in webcam, desktop USB cameras)
         try {
           stream = await navigator.mediaDevices.getUserMedia({ video: true });
         } catch (err2) {
-          console.error('All camera access attempts failed:', err2);
+          console.error('All camera requests failed:', err2);
           let errorMsg = 'Could not access camera. Please allow camera permissions in your browser address bar.';
           let errorType = 'UNKNOWN';
 
           if (err2.name === 'NotAllowedError' || err2.name === 'PermissionDeniedError') {
             errorType = 'PERMISSION_DENIED';
-            errorMsg = 'Camera access is blocked. Click the camera/lock icon in your browser address bar to allow camera access, then click Start Camera again.';
+            errorMsg = 'Camera permission was denied. Click the lock/camera icon in your address bar to allow camera access, or use "Snap Photo with Camera" below.';
           } else if (err2.name === 'NotFoundError' || err2.name === 'DevicesNotFoundError') {
             errorType = 'NOT_FOUND';
-            errorMsg = 'No camera device was detected on your computer. You can look up products using the manual barcode box below.';
+            errorMsg = 'No camera hardware found on this computer. Use "Snap Photo with Camera" or enter the barcode manually.';
           } else if (err2.name === 'NotReadableError' || err2.name === 'TrackStartError') {
             errorType = 'IN_USE';
-            errorMsg = 'Your camera is already in use by another tab or app (e.g. Zoom, Meet, Teams). Please close other camera apps and try again.';
+            errorMsg = 'Your camera is in use by another program (Zoom, Meet, Teams). Please close other camera programs and try again.';
           }
 
           setCameraError({ type: errorType, message: errorMsg });
@@ -209,41 +217,32 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
         return;
       }
 
+      streamRef.current = stream;
+
       try {
-        // Enumerate video devices now that user has granted camera permissions
+        // Enumerate video devices now that camera access is granted
         try {
-          const allDevices = await navigator.mediaDevices.enumerateDevices();
-          const videoInputs = allDevices.filter((d) => d.kind === 'videoinput');
-          setVideoDevices(videoInputs);
+          const all = await navigator.mediaDevices.enumerateDevices();
+          const vInputs = all.filter((d) => d.kind === 'videoinput');
+          setVideoDevices(vInputs);
         } catch (e) {
-          console.warn('Device enumeration failed:', e);
+          // ignore enumeration error
         }
 
-        // Attach stream to video element
-        videoRef.current.srcObject = stream;
+        // Attach stream directly to video element
+        const video = videoRef.current;
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.muted = true;
+
         try {
-          await videoRef.current.play();
+          await video.play();
         } catch (playErr) {
-          console.warn('Video play interrupted:', playErr);
+          console.warn('Video auto-play interrupted:', playErr);
         }
 
-        const reader = new BrowserMultiFormatReader(getHints());
-        readerRef.current = reader;
-
-        const controls = await reader.decodeFromStream(
-          stream,
-          videoRef.current,
-          (result, error) => {
-            if (result && !isScanningLocked.current) {
-              const text = result.getText();
-              if (text) {
-                handleDetectedCode(text);
-              }
-            }
-          }
-        );
-
-        controlsRef.current = controls;
+        // Display video immediately
         setIsCameraActive(true);
         setCameraLoading(false);
 
@@ -254,10 +253,29 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
           if (capabilities.torch) {
             setHasTorch(true);
           }
+          if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+          }
         }
-      } catch (decodeErr) {
-        console.error('ZXing decoder stream attachment failed:', decodeErr);
-        // Keep video element active so user at least sees video preview
+
+        // Start ZXing real-time canvas frame decoder
+        const reader = new BrowserMultiFormatReader(getHints(), {
+          delayBetweenScanAttempts: 150,
+          delayBetweenScanSuccess: 1000
+        });
+
+        const controls = reader.scan(video, (result, error) => {
+          if (result && !isScanningLocked.current) {
+            const text = result.getText();
+            if (text) {
+              handleDetectedCode(text);
+            }
+          }
+        });
+
+        controlsRef.current = controls;
+      } catch (scanInitErr) {
+        console.error('Frame scanner initialization error:', scanInitErr);
         setIsCameraActive(true);
         setCameraLoading(false);
       }
@@ -265,10 +283,72 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     [getHints, handleDetectedCode, stopCamera]
   );
 
+  // Decode Barcode from Photo Snapshot or Upload (100% works on phones without HTTPS!)
+  const handlePhotoCapture = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCameraLoading(true);
+    setCameraError(null);
+
+    try {
+      const url = URL.createObjectURL(file);
+      const reader = new BrowserMultiFormatReader(getHints());
+
+      try {
+        const result = await reader.decodeFromImageUrl(url);
+        URL.revokeObjectURL(url);
+
+        if (result && result.getText()) {
+          handleDetectedCode(result.getText());
+          return;
+        }
+      } catch (firstErr) {
+        // If initial decode failed, try with image element on canvas
+        const img = new Image();
+        img.src = url;
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = rej;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        URL.revokeObjectURL(url);
+        const result2 = reader.decodeFromCanvas(canvas);
+
+        if (result2 && result2.getText()) {
+          handleDetectedCode(result2.getText());
+          return;
+        }
+      }
+
+      setCameraError({
+        type: 'NO_BARCODE_FOUND',
+        message: 'Could not read a barcode in that photo. Please take a clearer photo with the barcode centered and well-lit, or type the numbers manually below.'
+      });
+    } catch (err) {
+      console.warn('Photo barcode decode error:', err);
+      setCameraError({
+        type: 'DECODE_ERROR',
+        message: 'Could not detect a clear barcode stripe pattern. Please ensure good lighting or enter the numbers manually below.'
+      });
+    } finally {
+      setCameraLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   // Toggle Torch / Flashlight
   const toggleTorch = async () => {
     try {
-      const stream = videoRef.current?.srcObject;
+      const stream = streamRef.current || videoRef.current?.srcObject;
       if (!stream) return;
       const track = stream.getVideoTracks()[0];
       if (track && hasTorch) {
@@ -337,15 +417,23 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
 
   return (
     <div className="w-full space-y-6">
+      {/* Hidden File / Camera Capture Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handlePhotoCapture}
+        className="hidden"
+      />
+
       {/* Live Video Viewfinder Card */}
       <Card className="relative overflow-hidden bg-berry-900 border-2 border-brand-border p-0 shadow-soft-xl rounded-3xl">
         <div className="relative aspect-[4/3] sm:aspect-[16/9] w-full bg-black flex items-center justify-center overflow-hidden">
           {/* Native HTML5 Video Element */}
           <video
             ref={videoRef}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
-              isCameraActive ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
             playsInline
             muted
             autoPlay
@@ -353,36 +441,52 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
 
           {/* Idle / Off Screen */}
           {!isCameraActive && !cameraLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-berry-900/90 to-berry/95 text-white space-y-4">
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-berry-900/95 to-berry/95 text-white space-y-5">
               <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-warm">
                 <Camera className="w-8 h-8" />
               </div>
               <div className="space-y-1 max-w-sm">
-                <h3 className="font-heading font-extrabold text-lg text-white">
+                <h3 className="font-heading font-extrabold text-xl text-white">
                   High-Precision Barcode Scanner
                 </h3>
                 <p className="text-xs text-soft-pink leading-relaxed">
                   Supports Indian EAN-13, EAN-8, UPC, and FMCG retail packages with automatic focus and multi-angle recognition.
                 </p>
               </div>
-              <Button
-                variant="primary"
-                size="md"
-                icon={Camera}
-                onClick={() => startCamera()}
-                className="shadow-vibrant-glow"
-              >
-                Start Camera
-              </Button>
+
+              {/* Action Buttons: Live Camera or Camera Snap */}
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md pt-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon={Camera}
+                  onClick={() => startCamera()}
+                  className="w-full sm:flex-1 shadow-vibrant-glow text-sm font-bold"
+                >
+                  Start Live Camera
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/30 text-white font-heading font-bold text-sm backdrop-blur-sm transition-all"
+                >
+                  <Upload className="w-4 h-4 text-warm" />
+                  <span>Snap Photo to Scan</span>
+                </button>
+              </div>
+
+              <div className="text-[11px] text-white/70">
+                💡 Mobile tip: If live streaming is restricted on local Wi-Fi, tap <strong>Snap Photo to Scan</strong> to open your phone camera directly!
+              </div>
             </div>
           )}
 
           {/* Loading Camera State */}
           {cameraLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-berry-900 text-white space-y-3">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-berry-900 text-white space-y-3 z-20">
               <RefreshCw className="w-8 h-8 text-vibrant animate-spin" />
-              <span className="text-xs font-heading font-bold text-soft-pink">
-                Initializing camera optics...
+              <span className="text-sm font-heading font-bold text-soft-pink">
+                Scanning barcode...
               </span>
             </div>
           )}
@@ -411,7 +515,7 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
               </div>
 
               {/* Hardware Controls Toolbar */}
-              <div className="absolute top-4 right-4 flex items-center gap-2">
+              <div className="absolute top-4 right-4 flex items-center gap-2 z-30">
                 {hasTorch && (
                   <button
                     type="button"
@@ -451,15 +555,30 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
           )}
         </div>
 
-        {/* Camera Permission or Hardware Error */}
+        {/* Camera Permission or Hardware Error Banner */}
         {cameraError && (
-          <div className="p-4 bg-rose-900/90 text-rose-100 flex items-start gap-3 border-t border-rose-700 text-xs">
-            <AlertCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span className="font-bold">{cameraError.message}</span>
-              <p className="text-rose-200">
-                You can still look up any product immediately using the manual barcode box below.
-              </p>
+          <div className="p-4 bg-rose-950 text-rose-100 flex items-start gap-3 border-t border-rose-700 text-xs">
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-1.5 flex-1">
+              <span className="font-bold block text-sm text-rose-200">Camera Notice:</span>
+              <p className="text-rose-200/90 leading-relaxed">{cameraError.message}</p>
+              <div className="pt-1 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-vibrant hover:bg-vibrant-hover text-white font-heading font-bold text-xs inline-flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Snap Photo with Camera</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startCamera()}
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-heading font-bold text-xs"
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -561,4 +680,3 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     </div>
   );
 };
-
