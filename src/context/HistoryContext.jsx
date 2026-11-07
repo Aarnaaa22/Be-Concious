@@ -8,7 +8,8 @@ export const HistoryProvider = ({ children }) => {
     try {
       const saved = localStorage.getItem('be_conscious_history');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.error('Error loading history from localStorage', e);
@@ -33,11 +34,20 @@ export const HistoryProvider = ({ children }) => {
   const [savedProducts, setSavedProducts] = useState(() => {
     try {
       const saved = localStorage.getItem('be_conscious_saved');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // If legacy format of string IDs, hydrate from mockProducts
+          if (parsed.length > 0 && typeof parsed[0] === 'string') {
+            return mockProducts.filter(p => parsed.includes(p.id));
+          }
+          return parsed;
+        }
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Error loading saved products from localStorage', e);
     }
-    return [mockProducts[0].id, mockProducts[2].id];
+    return [mockProducts[0], mockProducts[2]];
   });
 
   useEffect(() => {
@@ -57,19 +67,63 @@ export const HistoryProvider = ({ children }) => {
   }, [savedProducts]);
 
   const addToHistory = (product) => {
+    if (!product) return;
     setHistory((prev) => {
-      const filtered = prev.filter((item) => item.id !== product.id);
+      const key = product.barcode || product.id;
+      const filtered = prev.filter((item) => (item.barcode || item.id) !== key);
       return [{ ...product, scannedAt: new Date().toISOString() }, ...filtered];
     });
+  };
+
+  const removeFromHistory = (idOrBarcode) => {
+    if (!idOrBarcode) return;
+    setHistory((prev) => 
+      prev.filter((item) => item.id !== idOrBarcode && item.barcode !== idOrBarcode)
+    );
   };
 
   const clearHistory = () => {
     setHistory([]);
   };
 
-  const toggleSaveProduct = (id) => {
-    setSavedProducts((prev) => 
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+  const isSaved = (idOrBarcode) => {
+    if (!idOrBarcode) return false;
+    return savedProducts.some(
+      (p) => p.id === idOrBarcode || p.barcode === idOrBarcode
+    );
+  };
+
+  const toggleSaveProduct = (productOrId) => {
+    if (!productOrId) return;
+    setSavedProducts((prev) => {
+      let targetObj = null;
+      let targetKey = null;
+
+      if (typeof productOrId === 'object' && productOrId !== null) {
+        targetObj = productOrId;
+        targetKey = productOrId.barcode || productOrId.id;
+      } else {
+        targetKey = productOrId;
+        targetObj = mockProducts.find(p => p.id === targetKey || p.barcode === targetKey) ||
+                    history.find(p => p.id === targetKey || p.barcode === targetKey);
+      }
+
+      const exists = prev.some(p => p.id === targetKey || p.barcode === targetKey);
+      if (exists) {
+        return prev.filter(p => p.id !== targetKey && p.barcode !== targetKey);
+      } else {
+        if (targetObj) {
+          return [targetObj, ...prev];
+        }
+        return prev;
+      }
+    });
+  };
+
+  const removeSavedProduct = (idOrBarcode) => {
+    if (!idOrBarcode) return;
+    setSavedProducts((prev) =>
+      prev.filter((p) => p.id !== idOrBarcode && p.barcode !== idOrBarcode)
     );
   };
 
@@ -79,9 +133,11 @@ export const HistoryProvider = ({ children }) => {
         history,
         savedProducts,
         addToHistory,
+        removeFromHistory,
         clearHistory,
         toggleSaveProduct,
-        isSaved: (id) => savedProducts.includes(id)
+        removeSavedProduct,
+        isSaved
       }}
     >
       {children}
@@ -96,4 +152,5 @@ export const useHistory = () => {
   }
   return context;
 };
+
 

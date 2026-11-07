@@ -114,7 +114,7 @@ export const ProductAnalysisPage = () => {
     };
   }, [productId, addToHistory]);
 
-  const saved = product ? isSaved(product.id) : false;
+  const saved = product ? isSaved(product.barcode || product.id) : false;
 
   const handleShare = () => {
     if (navigator.clipboard) {
@@ -395,7 +395,7 @@ export const ProductAnalysisPage = () => {
               <div className="flex flex-wrap items-center gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => toggleSaveProduct(product.id)}
+                  onClick={() => toggleSaveProduct(product)}
                   className={`px-5 py-3 rounded-2xl font-heading text-sm font-bold border transition-all flex items-center gap-2 shadow-soft ${
                     saved 
                       ? 'bg-berry text-white border-berry shadow-soft-md' 
@@ -976,7 +976,7 @@ export const ProductAnalysisPage = () => {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
-            onClick={() => toggleSaveProduct(product.id)}
+            onClick={() => toggleSaveProduct(product)}
             className={`px-6 py-3.5 rounded-2xl font-heading text-sm font-bold border transition-all flex items-center gap-2 ${
               saved 
                 ? 'bg-berry text-white border-berry shadow-soft' 
