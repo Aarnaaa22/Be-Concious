@@ -88,7 +88,7 @@ export function normalizeProduct(raw) {
       .map((name) => ({ name, percent: null, isVegan: false, isVegetarian: false }));
   }
 
-  // Allergens
+  // Confirmed Allergens vs Possible Traces (Cross-contamination)
   let allergens = [];
   if (Array.isArray(p.allergens_tags) && p.allergens_tags.length > 0) {
     allergens = p.allergens_tags.map((a) =>
@@ -96,6 +96,15 @@ export function normalizeProduct(raw) {
     );
   } else if (p.allergens) {
     allergens = p.allergens.split(',').map((a) => a.trim()).filter(Boolean);
+  }
+
+  let traces = [];
+  if (Array.isArray(p.traces_tags) && p.traces_tags.length > 0) {
+    traces = p.traces_tags.map((t) =>
+      t.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+  } else if (p.traces) {
+    traces = p.traces.split(',').map((t) => t.trim()).filter(Boolean);
   }
 
   // Additives
@@ -168,6 +177,7 @@ export function normalizeProduct(raw) {
 
     ingredients,
     allergens,
+    traces,
     additives,
     rawPayload: p,
     isExternal: true,

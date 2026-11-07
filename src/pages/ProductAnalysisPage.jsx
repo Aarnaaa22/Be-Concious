@@ -34,21 +34,9 @@ import {
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge, NovaBadge, ConsciousScoreBadge } from '../components/common/Badge';
+import { IngredientDetective } from '../components/product/IngredientDetective';
 import { mockProducts, getProductById, getProductByBarcode, fetchProductByBarcode } from '../data/mockProducts';
 import { useHistory } from '../context/HistoryContext';
-
-// Additive descriptions database for friendly objective explanations
-const ADDITIVE_EXPLANATIONS = {
-  'E150D': { name: 'Sulfite Ammonia Caramel', desc: 'A food colouring made by heat treatment of carbohydrates with sulfites, creating rich brown tones in sodas.' },
-  'E338': { name: 'Phosphoric Acid', desc: 'An acidity regulator giving colas their distinct sharp tang and helping prevent bacterial growth.' },
-  'E322': { name: 'Lecithins', desc: 'A natural plant-derived emulsifier (often from soybeans or sunflowers) that keeps cocoa and fats smoothly blended.' },
-  'E330': { name: 'Citric Acid', desc: 'A natural organic acid found in citrus fruits, used for tart freshness and natural preservation.' },
-  'E471': { name: 'Mono- and Diglycerides of Fatty Acids', desc: 'Emulsifiers derived from plant or animal fats used to keep textures soft and prevent oil separation.' },
-  'E621': { name: 'Monosodium Glutamate (MSG)', desc: 'The sodium salt of glutamic acid, an amino acid that enhances savory (umami) flavors.' },
-  'E415': { name: 'Xanthan Gum', desc: 'A natural soluble plant fiber created by fermentation, used to gently thicken dressings and sauces.' },
-  'E412': { name: 'Guar Gum', desc: 'A natural dietary fiber extracted from guar beans, helping create a creamy mouthfeel.' },
-  'E440': { name: 'Pectins', desc: 'Natural fruit fiber extracted from apples and citrus peels, commonly used to set jams and jellies.' }
-};
 
 export const ProductAnalysisPage = () => {
   const { productId } = useParams();
@@ -63,9 +51,6 @@ export const ProductAnalysisPage = () => {
 
   // Progressive disclosure accordions
   const [showFormulaModal, setShowFormulaModal] = useState(false);
-  const [showIngredientsExpanded, setShowIngredientsExpanded] = useState(false);
-  const [showAdditivesExpanded, setShowAdditivesExpanded] = useState(false);
-  const [showAllergensExpanded, setShowAllergensExpanded] = useState(false);
 
   // Comparison Drawer / Modal State
   const [isCompareOpen, setIsCompareOpen] = useState(false);
@@ -921,180 +906,9 @@ export const ProductAnalysisPage = () => {
 
 
       {/* ========================================================================= */}
-      {/* SECTION 5: INGREDIENT DETECTIVE                                           */}
+      {/* SECTION 5: INGREDIENT DETECTIVE (ENHANCED)                                 */}
       {/* ========================================================================= */}
-      <section className="space-y-4">
-        <div>
-          <Badge variant="warm" size="md">
-            Transparency Detective
-          </Badge>
-          <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-berry mt-1">
-            What's Actually Inside?
-          </h2>
-          <p className="text-sm text-brand-muted">
-            Expandable ingredient breakdown, verified additives, and declared allergen notices.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          
-          {/* Card A: Full Ingredient List (Expandable) */}
-          <div className="rounded-3xl border border-brand-border bg-white overflow-hidden shadow-soft transition-all">
-            <button
-              type="button"
-              onClick={() => setShowIngredientsExpanded(!showIngredientsExpanded)}
-              className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 focus:outline-none hover:bg-soft-light/40 transition-colors"
-            >
-              <div className="space-y-1">
-                <h3 className="text-base font-heading font-bold text-berry flex items-center gap-2">
-                  <span>Full Declared Ingredients</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand-bg border border-brand-border font-mono text-brand-muted">
-                    {product.ingredients?.length || 0} items
-                  </span>
-                </h3>
-                <p className="text-xs text-brand-muted">
-                  Ingredients listed in order of predominance by weight from the package label.
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-soft-light flex items-center justify-center text-berry flex-shrink-0">
-                {showIngredientsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </div>
-            </button>
-
-            {showIngredientsExpanded && (
-              <div className="p-6 pt-0 border-t border-brand-border/60 bg-brand-bg/30 space-y-3 animate-fadeIn">
-                {product.ingredients && product.ingredients.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3">
-                    {product.ingredients.map((ing, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-2xl bg-white border border-brand-border flex items-center justify-between text-xs font-semibold"
-                      >
-                        <span className="text-brand-text">{ing.name}</span>
-                        {ing.percent !== null && (
-                          <span className="text-vibrant font-mono font-bold">~{ing.percent}%</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-brand-muted pt-3">
-                    Full ingredient text was not declared in the open registry for this item.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card B: Identified Additives & E-Numbers (Expandable) */}
-          <div className="rounded-3xl border border-brand-border bg-white overflow-hidden shadow-soft transition-all">
-            <button
-              type="button"
-              onClick={() => setShowAdditivesExpanded(!showAdditivesExpanded)}
-              className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 focus:outline-none hover:bg-soft-light/40 transition-colors"
-            >
-              <div className="space-y-1">
-                <h3 className="text-base font-heading font-bold text-berry flex items-center gap-2">
-                  <span>Identified Additives & E-Numbers</span>
-                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                    product.additives?.length > 0 ? 'bg-berry-50 text-berry border border-berry-200' : 'bg-warm-light text-berry'
-                  }`}>
-                    {product.additives?.length || 0} detected
-                  </span>
-                </h3>
-                <p className="text-xs text-brand-muted">
-                  Objective explanations of preservatives, emulsifiers, and colorings.
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-soft-light flex items-center justify-center text-berry flex-shrink-0">
-                {showAdditivesExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </div>
-            </button>
-
-            {showAdditivesExpanded && (
-              <div className="p-6 pt-0 border-t border-brand-border/60 bg-brand-bg/30 space-y-3 animate-fadeIn">
-                {product.additives && product.additives.length > 0 ? (
-                  <div className="space-y-2.5 pt-3">
-                    {product.additives.map((add, idx) => {
-                      const info = ADDITIVE_EXPLANATIONS[add] || {
-                        name: 'Approved Food Additive',
-                        desc: 'Officially evaluated food additive registered with European EFSA and global FDA food safety authorities.'
-                      };
-                      return (
-                        <div key={idx} className="p-3.5 rounded-2xl bg-white border border-brand-border space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-berry text-xs px-2 py-0.5 rounded bg-berry-50 border border-berry-200">
-                              {add}
-                            </span>
-                            <span className="text-xs font-heading font-bold text-brand-text">
-                              {info.name}
-                            </span>
-                          </div>
-                          <p className="text-xs text-brand-muted leading-relaxed">
-                            {info.desc}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 mt-3 rounded-2xl bg-warm-light border border-warm/80 flex items-center gap-2 text-xs font-semibold text-berry">
-                    <CheckCircle2 className="w-4 h-4 text-berry flex-shrink-0" />
-                    <span>Zero chemical food additives or artificial colorings found in this product's record!</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card C: Declared Allergens (Expandable) */}
-          <div className="rounded-3xl border border-brand-border bg-white overflow-hidden shadow-soft transition-all">
-            <button
-              type="button"
-              onClick={() => setShowAllergensExpanded(!showAllergensExpanded)}
-              className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 focus:outline-none hover:bg-soft-light/40 transition-colors"
-            >
-              <div className="space-y-1">
-                <h3 className="text-base font-heading font-bold text-berry flex items-center gap-2">
-                  <span>Declared Allergens & Sensitivity Notice</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand-bg border border-brand-border font-mono text-brand-muted">
-                    {product.allergens?.length || 0} declared
-                  </span>
-                </h3>
-                <p className="text-xs text-brand-muted">
-                  Immediate alerts for dairy, nuts, soy, gluten, and common cross-contaminants.
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-soft-light flex items-center justify-center text-berry flex-shrink-0">
-                {showAllergensExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </div>
-            </button>
-
-            {showAllergensExpanded && (
-              <div className="p-6 pt-0 border-t border-brand-border/60 bg-brand-bg/30 space-y-3 animate-fadeIn">
-                {product.allergens && product.allergens.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 pt-3">
-                    {product.allergens.map((alg, idx) => (
-                      <span
-                        key={idx}
-                        className="text-xs px-3.5 py-1.5 rounded-full bg-berry-50 border border-berry-200 text-berry font-bold flex items-center gap-1.5"
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5 text-vibrant" />
-                        <span>{alg}</span>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-brand-muted pt-3">
-                    No allergens declared on the packaging or database record.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-        </div>
-      </section>
+      <IngredientDetective product={product} />
 
 
       {/* ========================================================================= */}

@@ -298,14 +298,14 @@ export const ScanFoodPage = () => {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
       
       {/* Page Header (Exact requested typography & copy) */}
-      <div className="text-center max-w-2xl mx-auto space-y-3">
-        <Badge variant="soft" size="md">
-          Live Food Barcode Scanner
-        </Badge>
-        <h1 className="text-3xl sm:text-5xl font-heading font-extrabold text-berry tracking-tight">
+      <div className="text-center max-w-2xl mx-auto space-y-2">
+        <span className="text-xs font-heading font-extrabold text-vibrant uppercase tracking-wider">
+          Instant Detection
+        </span>
+        <h1 className="text-3xl sm:text-5xl font-heading font-black text-berry tracking-tight">
           Scan Before You Snack!
         </h1>
-        <p className="text-base sm:text-lg text-brand-muted font-body">
+        <p className="text-sm sm:text-base text-brand-muted font-body leading-relaxed">
           One little scan. A whole lot of information.
         </p>
       </div>
@@ -316,10 +316,10 @@ export const ScanFoodPage = () => {
         {/* LEFT COLUMN: LIVE SCANNER CARD                                            */}
         {/* ========================================================================= */}
         <div className="lg:col-span-7">
-          <Card className="bg-white border border-brand-border p-6 sm:p-8 space-y-6 shadow-soft-lg">
+          <div className="paper-card rounded-3xl p-6 sm:p-8 space-y-6">
             
             {/* Header & Controls Status */}
-            <div className="flex items-center justify-between pb-3 border-b border-brand-border">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EFE4EB]">
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${isCameraActive ? 'bg-vibrant animate-ping' : 'bg-brand-muted/40'}`} />
                 <span className="text-xs font-heading font-bold text-berry uppercase tracking-wider">
@@ -341,7 +341,7 @@ export const ScanFoodPage = () => {
             </div>
 
             {/* Live Camera Viewfinder Box */}
-            <div className="relative aspect-[4/3] rounded-3xl bg-berry-dark overflow-hidden flex flex-col items-center justify-center border-2 border-brand-border">
+            <div className="relative aspect-[4/3] rounded-3xl bg-berry-dark overflow-hidden flex flex-col items-center justify-center border-2 border-[#EFE4EB]">
               
               {/* Actual HTML5 Video Stream for ZXing */}
               <video
@@ -356,7 +356,7 @@ export const ScanFoodPage = () => {
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
                   
                   {/* Subtle dark vignette to guide focus */}
-                  <div className="absolute inset-0 bg-black/30" />
+                  <div className="absolute inset-0 bg-black/35" />
 
                   {/* Scanning Target Frame with Vibrant Pink border */}
                   <div className="relative w-72 h-44 border-2 border-vibrant/90 rounded-2xl flex items-center justify-center shadow-vibrant-glow overflow-hidden z-10">
@@ -372,12 +372,12 @@ export const ScanFoodPage = () => {
 
                     {/* Center guidance text */}
                     <span className="text-[11px] font-heading font-semibold text-white/90 bg-black/40 px-2.5 py-1 rounded-full backdrop-blur-xs">
-                      Align barcode here
+                      Align barcode inside frame
                     </span>
                   </div>
 
                   <div className="mt-4 z-10">
-                    <span className="text-xs font-medium text-white/95 bg-berry/80 px-3 py-1 rounded-full backdrop-blur-xs">
+                    <span className="text-xs font-medium text-white/95 bg-berry/90 px-3.5 py-1 rounded-full backdrop-blur-xs border border-white/10">
                       Supports EAN-13, EAN-8, UPC-A & UPC-E
                     </span>
                   </div>
@@ -421,7 +421,7 @@ export const ScanFoodPage = () => {
                       Decoding Barcode: {lastScannedCode || manualBarcode}
                     </h4>
                     <p className="text-xs text-brand-muted mt-1">
-                      Analyzing ingredients, allergens, and NOVA classification...
+                      Connecting to Open Food Facts database...
                     </p>
                   </div>
                 </div>
@@ -490,14 +490,14 @@ export const ScanFoodPage = () => {
             </div>
 
             {/* Warm Yellow Information Tips */}
-            <div className="p-4 rounded-2xl bg-warm-light border border-warm/80 flex items-start gap-3">
+            <div className="p-4 rounded-2xl bg-warm-light/60 border border-warm/80 flex items-start gap-3">
               <Lightbulb className="w-5 h-5 text-berry flex-shrink-0 mt-0.5" />
               <div className="text-xs text-brand-text leading-relaxed">
                 <span className="font-bold text-berry">Helpful Scanning Tip:</span> Hold the barcode 4–8 inches away in good lighting. If glare appears on plastic packaging, tilt the box slightly.
               </div>
             </div>
 
-          </Card>
+          </div>
         </div>
 
 
