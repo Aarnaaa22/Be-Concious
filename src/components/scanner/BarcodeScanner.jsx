@@ -29,6 +29,7 @@ import { scanLogger } from '../../utils/scanLogger';
 export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
+  const readerRef = useRef(null);
   const isScanningLocked = useRef(false);
 
   // Camera Hardware States
@@ -70,9 +71,7 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject;
         stream.getTracks().forEach((track) => {
-          if (track.readyState === 'live') {
-            track.stop();
-          }
+          track.stop();
         });
         videoRef.current.srcObject = null;
       }
@@ -146,13 +145,13 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     [isProcessing, onBarcodeDetected, stopCamera, triggerSuccessFeedback]
   );
 
-  // Start live camera stream
+  // Start live camera stream with universal mobile & desktop fallback
   const startCamera = useCallback(
     async (deviceIdToUse = null) => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setCameraError({
           type: 'UNSUPPORTED',
-          message: 'Camera API is not supported in this browser or requires HTTPS/localhost.'
+          message: 'Camera API is not supported in this browser. Please ensure HTTPS or localhost is active, or use manual input below.'
         });
         return;
       }
@@ -162,37 +161,77 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
       setCameraError(null);
       isScanningLocked.current = false;
 
+      let stream = null;
+
+      // 1. Primary Attempt: Environment facingMode with HD constraints (great for mobile)
       try {
-        // Enumerate video devices
-        let devices = [];
+        const constraints = deviceIdToUse
+          ? { video: { deviceId: { exact: deviceIdToUse } } }
+          : {
+              video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              }
+            };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err1) {
+        console.warn('Initial camera constraints failed, attempting generic webcam fallback:', err1);
+
+        // 2. Secondary Fallback: Universal generic video constraint (laptop webcams, desktop USB cameras)
         try {
-          devices = await BrowserMultiFormatReader.listVideoInputDevices();
-          setVideoDevices(devices);
-        } catch (e) {
-          console.warn('Could not list video devices:', e);
-        }
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (err2) {
+          console.error('All camera access attempts failed:', err2);
+          let errorMsg = 'Could not access camera. Please allow camera permissions in your browser address bar.';
+          let errorType = 'UNKNOWN';
 
-        // Target device priority: rear/environment camera
-        let targetId = deviceIdToUse || selectedDeviceId;
-        if (!targetId && devices.length > 0) {
-          const rear = devices.find((d) =>
-            /back|rear|environment/i.test(d.label)
-          );
-          targetId = rear ? rear.deviceId : devices[0].deviceId;
-          setSelectedDeviceId(targetId);
-        }
+          if (err2.name === 'NotAllowedError' || err2.name === 'PermissionDeniedError') {
+            errorType = 'PERMISSION_DENIED';
+            errorMsg = 'Camera access is blocked. Click the camera/lock icon in your browser address bar to allow camera access, then click Start Camera again.';
+          } else if (err2.name === 'NotFoundError' || err2.name === 'DevicesNotFoundError') {
+            errorType = 'NOT_FOUND';
+            errorMsg = 'No camera device was detected on your computer. You can look up products using the manual barcode box below.';
+          } else if (err2.name === 'NotReadableError' || err2.name === 'TrackStartError') {
+            errorType = 'IN_USE';
+            errorMsg = 'Your camera is already in use by another tab or app (e.g. Zoom, Meet, Teams). Please close other camera apps and try again.';
+          }
 
-        const reader = new BrowserMultiFormatReader(getHints(), {
-          delayBetweenScanAttempts: 150
-        });
-
-        if (!videoRef.current) {
+          setCameraError({ type: errorType, message: errorMsg });
+          setIsCameraActive(false);
           setCameraLoading(false);
           return;
         }
+      }
 
-        const controls = await reader.decodeFromVideoDevice(
-          targetId || undefined,
+      if (!stream || !videoRef.current) {
+        setCameraLoading(false);
+        return;
+      }
+
+      try {
+        // Enumerate video devices now that user has granted camera permissions
+        try {
+          const allDevices = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = allDevices.filter((d) => d.kind === 'videoinput');
+          setVideoDevices(videoInputs);
+        } catch (e) {
+          console.warn('Device enumeration failed:', e);
+        }
+
+        // Attach stream to video element
+        videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn('Video play interrupted:', playErr);
+        }
+
+        const reader = new BrowserMultiFormatReader(getHints());
+        readerRef.current = reader;
+
+        const controls = await reader.decodeFromStream(
+          stream,
           videoRef.current,
           (result, error) => {
             if (result && !isScanningLocked.current) {
@@ -208,49 +247,22 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
         setIsCameraActive(true);
         setCameraLoading(false);
 
-        // Check torch capabilities & autofocus
-        try {
-          const stream = videoRef.current?.srcObject;
-          if (stream) {
-            const track = stream.getVideoTracks()[0];
-            if (track) {
-              const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-              if (capabilities.torch) {
-                setHasTorch(true);
-              }
-              // Attempt continuous autofocus
-              if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                await track.applyConstraints({
-                  advanced: [{ focusMode: 'continuous' }]
-                });
-              }
-            }
+        // Check torch capabilities
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+          if (capabilities.torch) {
+            setHasTorch(true);
           }
-        } catch (e) {
-          // Non-critical capability check failure
         }
-      } catch (err) {
-        console.error('Camera startup error:', err);
-        let errorMsg = 'Could not access the camera. Check camera permissions or enter the barcode manually.';
-        let errorType = 'UNKNOWN';
-
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          errorType = 'PERMISSION_DENIED';
-          errorMsg = 'Camera permission was denied. Please allow camera access in your browser bar.';
-        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          errorType = 'NOT_FOUND';
-          errorMsg = 'No camera hardware found on this device.';
-        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-          errorType = 'IN_USE';
-          errorMsg = 'Camera is currently in use by another tab or program.';
-        }
-
-        setCameraError({ type: errorType, message: errorMsg });
-        setIsCameraActive(false);
+      } catch (decodeErr) {
+        console.error('ZXing decoder stream attachment failed:', decodeErr);
+        // Keep video element active so user at least sees video preview
+        setIsCameraActive(true);
         setCameraLoading(false);
       }
     },
-    [getHints, handleDetectedCode, selectedDeviceId, stopCamera]
+    [getHints, handleDetectedCode, stopCamera]
   );
 
   // Toggle Torch / Flashlight
