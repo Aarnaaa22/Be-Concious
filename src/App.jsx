@@ -1,0 +1,46 @@
+import React, { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import { Navbar } from './components/layout/Navbar';
+import { Footer } from './components/layout/Footer';
+import { HomePage } from './pages/HomePage';
+import { ScanFoodPage } from './pages/ScanFoodPage';
+import { ProductAnalysisPage } from './pages/ProductAnalysisPage';
+import { ExploreProductsPage } from './pages/ExploreProductsPage';
+import { MyHistoryPage } from './pages/MyHistoryPage';
+import { AboutPage } from './pages/AboutPage';
+
+// Scroll to top on route change
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
+export function App() {
+  return (
+    <div className="min-h-screen flex flex-col bg-brand-bg text-brand-text">
+      <ScrollToTop />
+      <Navbar />
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/scan" element={<ScanFoodPage />} />
+          <Route path="/analysis" element={<ProductAnalysisPage />} />
+          <Route path="/analysis/:productId" element={<ProductAnalysisPage />} />
+          <Route path="/explore" element={<ExploreProductsPage />} />
+          <Route path="/history" element={<MyHistoryPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="*" element={<HomePage />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+export default App;
+
