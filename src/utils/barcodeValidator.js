@@ -124,3 +124,4 @@ export function normalizeBarcode(input) {
     .trim()
     .replace(/\s+/g, '');
 }
+

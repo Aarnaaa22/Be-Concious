@@ -48,3 +48,4 @@ create policy "Users can update their submitted products"
   on public.products for update
   using (auth.uid() is not null and auth.uid() = submitted_by)
   with check (auth.uid() is not null and auth.uid() = submitted_by);
+

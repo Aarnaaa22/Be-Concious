@@ -307,3 +307,4 @@ export function extractBrandAndProductFromText(rawText) {
     name: candidateName,
   };
 }
+

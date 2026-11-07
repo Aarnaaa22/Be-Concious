@@ -39,3 +39,4 @@ export const scanLogger = {
     logBuffer.length = 0;
   }
 };
+

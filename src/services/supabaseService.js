@@ -22,9 +22,9 @@ export const supabaseService = {
    */
   async signUpWithEmail({ email, password, fullName }) {
     if (!isSupabaseConfigured()) {
-      return { 
-        data: null, 
-        error: new Error('Supabase is not yet configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.') 
+      return {
+        data: null,
+        error: new Error('Supabase is not yet configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.')
       };
     }
 
@@ -53,9 +53,9 @@ export const supabaseService = {
    */
   async signInWithEmail({ email, password }) {
     if (!isSupabaseConfigured()) {
-      return { 
-        data: null, 
-        error: new Error('Supabase is not configured. Please add your credentials in .env.') 
+      return {
+        data: null,
+        error: new Error('Supabase is not configured. Please add your credentials in .env.')
       };
     }
 
@@ -78,9 +78,9 @@ export const supabaseService = {
    */
   async signInWithGoogle() {
     if (!isSupabaseConfigured()) {
-      return { 
-        data: null, 
-        error: new Error('Supabase is not configured. Connect your Supabase project with Google OAuth enabled.') 
+      return {
+        data: null,
+        error: new Error('Supabase is not configured. Connect your Supabase project with Google OAuth enabled.')
       };
     }
 
@@ -124,9 +124,9 @@ export const supabaseService = {
    */
   async resetPasswordForEmail(email) {
     if (!isSupabaseConfigured()) {
-      return { 
-        data: null, 
-        error: new Error('Supabase is not configured.') 
+      return {
+        data: null,
+        error: new Error('Supabase is not configured.')
       };
     }
 
@@ -249,9 +249,9 @@ export const supabaseService = {
         .maybeSingle();
 
       if (error) throw error;
-      return { 
-        data: data || { dietary_preferences: [], allergen_preferences: [] }, 
-        error: null 
+      return {
+        data: data || { dietary_preferences: [], allergen_preferences: [] },
+        error: null
       };
     } catch (err) {
       console.error('Error fetching preferences:', err.message);

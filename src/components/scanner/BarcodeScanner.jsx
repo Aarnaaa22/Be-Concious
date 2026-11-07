@@ -549,3 +549,4 @@ export const BarcodeScanner = ({ onBarcodeDetected, isProcessing = false }) => {
     </div>
   );
 };
+
