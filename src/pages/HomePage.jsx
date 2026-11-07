@@ -29,29 +29,32 @@ import {
   Maximize2,
   Atom,
   Clock,
-  Compass
+  Compass,
+  Package,
+  Layers3
 } from 'lucide-react';
 
 /* =========================================================================
-   CANVAS PARTICLE EXPLOSION ENGINE (Scene 02)
-   High-performance HTML5 Canvas simulation rendering 150+ crystals, droplets,
-   and fragments exploding radially based on scroll progress.
+   CANVAS PARTICLE EXPLOSION ENGINE (The Deconstruction)
+   High-performance HTML5 Canvas rendering 160+ active particles:
+   faceted sugar crystals, viscous amber oil droplets, diamond salt crystals,
+   and chemical additive glow markers.
    ========================================================================= */
-const ExplosionCanvas = ({ progress }) => {
+const ExplosionCanvas = ({ stage = 'burst' }) => {
   const canvasRef = useRef(null);
   const particlesRef = useRef([]);
 
   useEffect(() => {
-    // Generate 160 deterministic particles with diverse behaviors
+    // Generate 160 deterministic particles with distinct physical behaviors
     const types = ['sugar', 'salt', 'oil', 'crumb', 'additive'];
     const p = [];
     for (let i = 0; i < 160; i++) {
       const angle = (Math.PI * 2 * i) / 160 + (Math.sin(i * 3.7) * 0.4);
-      const speed = 180 + (i % 17) * 35; // Expansion radius
+      const speed = 190 + (i % 17) * 38; // Expansion radius
       const type = types[i % types.length];
-      const size = type === 'oil' ? 10 + (i % 8) * 3 : (type === 'sugar' ? 6 + (i % 5) * 3 : 4 + (i % 4) * 2);
-      const rotSpeed = ((i % 11) - 5) * 0.8;
-      p.push({ angle, speed, type, size, rotSpeed, id: i });
+      const size = type === 'oil' ? 10 + (i % 8) * 3 : (type === 'sugar' ? 7 + (i % 5) * 3 : 5 + (i % 4) * 2);
+      const rotSpeed = ((i % 11) - 5) * 0.9;
+      p.push({ angle, speed, type, size, rotSpeed, id: i, phase: (i * 0.13) });
     }
     particlesRef.current = p;
   }, []);
@@ -61,86 +64,86 @@ const ExplosionCanvas = ({ progress }) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let animationFrameId;
+    let time = 0;
 
     const render = () => {
+      time += 0.02;
       const width = canvas.width;
       const height = canvas.height;
       ctx.clearRect(0, 0, width, height);
 
-      // Only draw if burst progress > 0.25
-      const burstFactor = Math.max(0, Math.min(1, (progress - 0.25) / 0.55));
+      const cx = width / 2;
+      const cy = height / 2;
+      const particles = particlesRef.current;
 
-      if (burstFactor > 0.01) {
-        const cx = width / 2;
-        const cy = height / 2;
-        const particles = particlesRef.current;
+      // Burst multiplier based on interactive stage
+      const expansion = stage === 'packaged' ? 0.18 : (stage === 'burst' ? 0.72 : 1.05);
 
-        for (let i = 0; i < particles.length; i++) {
-          const pt = particles[i];
-          // Ease-out cubic distance
-          const eased = 1 - Math.pow(1 - burstFactor, 3);
-          const dist = pt.speed * eased * (Math.min(width, height) / 380);
-          const px = cx + Math.cos(pt.angle) * dist;
-          const py = cy + Math.sin(pt.angle) * dist;
-          const alpha = burstFactor < 0.85 ? Math.min(1, burstFactor * 2.5) : Math.max(0, (1 - burstFactor) * 6);
+      for (let i = 0; i < particles.length; i++) {
+        const pt = particles[i];
+        // Floating organic drift
+        const driftX = Math.cos(time + pt.phase) * 8;
+        const driftY = Math.sin(time + pt.phase * 1.2) * 8;
+        const dist = pt.speed * expansion * (Math.min(width, height) / 400);
+        const px = cx + Math.cos(pt.angle) * dist + driftX;
+        const py = cy + Math.sin(pt.angle) * dist + driftY;
 
-          ctx.save();
-          ctx.translate(px, py);
-          ctx.rotate(pt.angle + pt.rotSpeed * burstFactor * Math.PI);
-          ctx.globalAlpha = alpha;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(pt.angle + time * pt.rotSpeed);
+        ctx.globalAlpha = stage === 'packaged' ? 0.4 : 0.92;
 
-          if (pt.type === 'sugar') {
-            // Refracted glowing white/cyan sugar cube
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-            ctx.shadowColor = '#FFE185';
-            ctx.shadowBlur = 10;
-            ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
-            ctx.strokeStyle = '#FFE185';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
-          } else if (pt.type === 'oil') {
-            // Golden amber viscous droplet
-            const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, pt.size);
-            grad.addColorStop(0, '#FFE185');
-            grad.addColorStop(0.7, '#F62477');
-            grad.addColorStop(1, 'rgba(146, 0, 58, 0.8)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(0, 0, pt.size, 0, Math.PI * 2);
-            ctx.fill();
-            // Highlight shine
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.beginPath();
-            ctx.arc(-pt.size * 0.3, -pt.size * 0.3, pt.size * 0.25, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (pt.type === 'salt') {
-            // Prismatic diamond salt crystal
-            ctx.fillStyle = '#FFFFFF';
-            ctx.shadowColor = '#FFADEE';
-            ctx.shadowBlur = 8;
-            ctx.beginPath();
-            ctx.moveTo(0, -pt.size);
-            ctx.lineTo(pt.size, 0);
-            ctx.lineTo(0, pt.size);
-            ctx.lineTo(-pt.size, 0);
-            ctx.closePath();
-            ctx.fill();
-          } else if (pt.type === 'crumb') {
-            // Crisp cocoa / biscuit particle
-            ctx.fillStyle = '#FFE185';
-            ctx.beginPath();
-            ctx.arc(0, 0, pt.size * 0.7, 0, Math.PI * 2);
-            ctx.fill();
-          } else {
-            // Chemical additive particle (E-number glow)
-            ctx.fillStyle = '#FFADEE';
-            ctx.shadowColor = '#F62477';
-            ctx.shadowBlur = 12;
-            ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
-          }
-
-          ctx.restore();
+        if (pt.type === 'sugar') {
+          // Refracted glowing white/yellow sugar cube
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.shadowColor = '#FFE185';
+          ctx.shadowBlur = 12;
+          ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
+          ctx.strokeStyle = '#FFE185';
+          ctx.lineWidth = 1.2;
+          ctx.strokeRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
+        } else if (pt.type === 'oil') {
+          // Golden amber viscous droplet
+          const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, pt.size);
+          grad.addColorStop(0, '#FFE185');
+          grad.addColorStop(0.7, '#F62477');
+          grad.addColorStop(1, 'rgba(146, 0, 58, 0.9)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(0, 0, pt.size, 0, Math.PI * 2);
+          ctx.fill();
+          // Highlight shine
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.beginPath();
+          ctx.arc(-pt.size * 0.3, -pt.size * 0.3, pt.size * 0.28, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (pt.type === 'salt') {
+          // Prismatic diamond salt crystal
+          ctx.fillStyle = '#FFFFFF';
+          ctx.shadowColor = '#FFADEE';
+          ctx.shadowBlur = 9;
+          ctx.beginPath();
+          ctx.moveTo(0, -pt.size);
+          ctx.lineTo(pt.size, 0);
+          ctx.lineTo(0, pt.size);
+          ctx.lineTo(-pt.size, 0);
+          ctx.closePath();
+          ctx.fill();
+        } else if (pt.type === 'crumb') {
+          // Crisp cocoa / biscuit grain
+          ctx.fillStyle = '#FFE185';
+          ctx.beginPath();
+          ctx.arc(0, 0, pt.size * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Chemical additive marker (E-number glow)
+          ctx.fillStyle = '#FFADEE';
+          ctx.shadowColor = '#F62477';
+          ctx.shadowBlur = 14;
+          ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
         }
+
+        ctx.restore();
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -160,12 +163,12 @@ const ExplosionCanvas = ({ progress }) => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
     };
-  }, [progress]);
+  }, [stage]);
 
   return (
     <canvas 
       ref={canvasRef} 
-      className="absolute inset-0 w-full h-full pointer-events-none z-20" 
+      className="absolute inset-0 w-full h-full pointer-events-none z-10" 
     />
   );
 };
@@ -173,24 +176,9 @@ const ExplosionCanvas = ({ progress }) => {
 export const HomePage = () => {
   const navigate = useNavigate();
 
-  // Global Page Scroll
+  // Global Page Scroll Progress for top bar
   const { scrollYProgress: globalScroll } = useScroll();
   const smoothProgress = useSpring(globalScroll, { stiffness: 90, damping: 28, restDelta: 0.001 });
-
-  // Chapter state
-  const [currentScene, setCurrentScene] = useState('01 / 06 HERO');
-
-  useEffect(() => {
-    const unsub = globalScroll.on('change', (v) => {
-      if (v < 0.16) setCurrentScene('01 / 06 THE HERO');
-      else if (v < 0.38) setCurrentScene('02 / 06 PRODUCT EXPLOSION');
-      else if (v < 0.58) setCurrentScene('03 / 06 INGREDIENT REVEAL');
-      else if (v < 0.76) setCurrentScene('04 / 06 NUTRITION DECODE');
-      else if (v < 0.90) setCurrentScene('05 / 06 THE SCANNER');
-      else setCurrentScene('06 / 06 CONSCIOUS CHOICE');
-    });
-    return () => unsub();
-  }, [globalScroll]);
 
   // Desktop Mouse Parallax
   const mouseX = useMotionValue(0);
@@ -207,33 +195,10 @@ export const HomePage = () => {
     mouseY.set(normY * 24);
   };
 
-  // Section 2: Product Explosion Scroll Tracking
+  // Section 2: Product Explosion Interactive State
+  // Default is 'burst' so the section is immediately spectacular and populated!
+  const [explosionStage, setExplosionStage] = useState('burst'); // 'packaged' | 'burst' | 'deconstructed'
   const explosionSectionRef = useRef(null);
-  const { scrollYProgress: explosionProgress } = useScroll({
-    target: explosionSectionRef,
-    offset: ['start start', 'end end']
-  });
-
-  const [rawExplosionVal, setRawExplosionVal] = useState(0);
-  useEffect(() => {
-    const unsub = explosionProgress.on('change', (v) => setRawExplosionVal(v));
-    return () => unsub();
-  }, [explosionProgress]);
-
-  // Section 2 Transformations
-  const packScale = useTransform(explosionProgress, [0, 0.25, 0.55, 0.85], [0.8, 1.1, 1.0, 0.75]);
-  const packRotateY = useTransform(explosionProgress, [0, 0.3, 0.6], [-20, 0, 15]);
-  const packRotateX = useTransform(explosionProgress, [0, 0.3, 0.6], [15, 0, -10]);
-  const foilLeftX = useTransform(explosionProgress, [0.25, 0.5], [0, -140]);
-  const foilLeftRotate = useTransform(explosionProgress, [0.25, 0.5], [0, -45]);
-  const foilRightX = useTransform(explosionProgress, [0.25, 0.5], [0, 140]);
-  const foilRightRotate = useTransform(explosionProgress, [0.25, 0.5], [0, 45]);
-  const burstOpacity = useTransform(explosionProgress, [0.28, 0.45, 0.85, 0.95], [0, 1, 1, 0]);
-  const explosionBg = useTransform(
-    explosionProgress, 
-    [0, 0.35, 0.7, 1], 
-    ['#F62477', '#92003A', '#4A001D', '#92003A']
-  );
 
   // Section 4 Nutrition Toggle State
   const [nutritionMode, setNutritionMode] = useState('100g'); // '100g' or 'daily'
@@ -245,6 +210,7 @@ export const HomePage = () => {
     >
       {/* =========================================================================
           PERSISTENT KINETIC HUD: Reading Progress & Instant "SKIP INTRO →"
+          (Note: All "1/6, 2/6... 6/6" scene indicators removed as requested)
           ========================================================================= */}
       <div className="fixed top-20 inset-x-0 z-40 pointer-events-none">
         {/* Progress Bar */}
@@ -253,15 +219,8 @@ export const HomePage = () => {
           className="h-1 bg-gradient-to-r from-[#FFE185] via-white to-[#FFE185] shadow-[0_0_12px_#FFE185]"
         />
 
-        {/* Dynamic Scene Pill & Skip Intro Bar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-          {/* Active Scene Indicator */}
-          <div className="pointer-events-auto flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-xl border border-white/20 text-[#FFE185] text-xs font-black tracking-widest uppercase shadow-2xl">
-            <span className="w-2 h-2 rounded-full bg-[#FFE185] animate-ping" />
-            <span>{currentScene}</span>
-          </div>
-
-          {/* Prominent Persistent Skip Intro Button */}
+        {/* Clean Skip Intro Bar aligned to right */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-end">
           <Link
             to="/scan"
             className="pointer-events-auto group inline-flex items-center gap-2.5 px-6 py-2.5 rounded-full bg-white text-[#92003A] font-black text-xs sm:text-sm tracking-wider uppercase hover:bg-[#FFE185] hover:text-[#92003A] hover:scale-105 active:scale-95 transition-all shadow-[0_8px_25px_rgba(0,0,0,0.35)] border border-white/30"
@@ -440,54 +399,84 @@ export const HomePage = () => {
       </section>
 
       {/* =========================================================================
-          SCENE 02 — THE PRODUCT EXPLOSION (PINNED 300vh STORYTELLING TRACK)
+          SCENE 02 — THE PRODUCT EXPLOSION (Fully Populated Cinematic Stage)
           ========================================================================= */}
       <section 
         ref={explosionSectionRef}
-        className="relative w-full h-[300vh]"
+        className="relative w-full min-h-screen py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#C90050] via-[#92003A] to-[#4A001D] overflow-hidden flex flex-col items-center justify-center"
       >
-        {/* Sticky Fullscreen Stage */}
-        <motion.div 
-          style={{ backgroundColor: explosionBg }}
-          className="sticky top-0 h-screen w-full flex flex-col items-center justify-center px-4 overflow-hidden"
-        >
-          {/* Dynamic Background Noise & Laser Beams */}
-          <div className="absolute inset-0 bg-radial-gradient from-transparent to-black/40 pointer-events-none" />
+        {/* Dynamic Background Noise & Laser Beams */}
+        <div className="absolute inset-0 bg-radial-gradient from-transparent to-black/60 pointer-events-none" />
 
-          {/* Canvas Radial Particle Explosion (renders 150+ sugar, oil, salt particles) */}
-          <ExplosionCanvas progress={rawExplosionVal} />
+        {/* Canvas Radial Particle Explosion (renders 160+ sugar, oil, salt particles) */}
+        <ExplosionCanvas stage={explosionStage} />
 
-          {/* Section Heading */}
-          <div className="absolute top-16 text-center z-30 px-4">
-            <span className="text-[#FFE185] font-black text-xs sm:text-sm tracking-widest uppercase block mb-1">
-              SCENE 02 — THE DECONSTRUCTION
-            </span>
-            <h2 className="font-heading font-black text-4xl sm:text-6xl md:text-7xl uppercase text-white tracking-tight drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
-              LET'S UNWRAP THE TRUTH.
-            </h2>
-            <p className="mt-2 text-sm sm:text-base font-bold text-white/80">
-              {rawExplosionVal < 0.3 
-                ? 'Scroll to tear open the packaging...' 
-                : rawExplosionVal < 0.7 
-                ? 'Watch the formulation burst into raw chemical components!' 
-                : 'Nothing stays hidden when you look with Be Conscious.'}
-            </p>
+        {/* Section Heading & Subtitle */}
+        <div className="relative text-center z-30 max-w-4xl mx-auto mb-10 px-4">
+          <span className="text-[#FFE185] font-black text-xs sm:text-sm tracking-widest uppercase block mb-3">
+            THE DECONSTRUCTION
+          </span>
+          <h2 className="font-heading font-black text-4xl sm:text-7xl md:text-8xl uppercase text-white tracking-tight drop-shadow-[0_10px_35px_rgba(0,0,0,0.8)] leading-none">
+            LET'S UNWRAP THE TRUTH.
+          </h2>
+          <p className="mt-4 text-base sm:text-xl font-bold text-white/90 max-w-2xl mx-auto">
+            Peel back the glossy marketing wrapper to expose the ultra-processed industrial components engineered inside.
+          </p>
+
+          {/* Interactive Stage Scrub Controls */}
+          <div className="mt-6 inline-flex items-center gap-2 p-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/20 shadow-2xl">
+            <button
+              onClick={() => setExplosionStage('packaged')}
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full font-heading font-black text-xs uppercase tracking-wider transition-all ${
+                explosionStage === 'packaged'
+                  ? 'bg-[#FFE185] text-[#92003A] shadow-lg scale-105'
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>Packaged</span>
+            </button>
+            <button
+              onClick={() => setExplosionStage('burst')}
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full font-heading font-black text-xs uppercase tracking-wider transition-all ${
+                explosionStage === 'burst'
+                  ? 'bg-[#F62477] text-white shadow-lg scale-105'
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#FFE185]" />
+              <span>Active Burst</span>
+            </button>
+            <button
+              onClick={() => setExplosionStage('deconstructed')}
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full font-heading font-black text-xs uppercase tracking-wider transition-all ${
+                explosionStage === 'deconstructed'
+                  ? 'bg-white text-[#92003A] shadow-lg scale-105'
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <Layers3 className="w-3.5 h-3.5 text-[#92003A]" />
+              <span>Full Anatomy</span>
+            </button>
           </div>
+        </div>
 
-          {/* 3D PRODUCT PACKAGING CONTAINER (Splits and Bursts Open) */}
-          <div className="relative w-72 sm:w-96 h-[26rem] sm:h-[30rem] z-20 flex items-center justify-center perspective-[1200px]">
+        {/* 3D PRODUCT PACKAGING CONTAINER (Splits Open In Center) */}
+        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center my-6 z-20">
+          
+          <div className="relative w-72 sm:w-88 h-[24rem] sm:h-[28rem] flex items-center justify-center perspective-[1200px]">
             
             {/* Left Wrapper Flap */}
             <motion.div 
-              style={{ 
-                x: foilLeftX,
-                rotateY: foilLeftRotate,
-                scale: packScale,
-                rotateZ: -4
+              animate={{ 
+                x: explosionStage === 'packaged' ? 0 : (explosionStage === 'burst' ? -110 : -160),
+                rotateY: explosionStage === 'packaged' ? 0 : (explosionStage === 'burst' ? -35 : -55),
+                rotateZ: explosionStage === 'packaged' ? 0 : -6
               }}
-              className="absolute left-0 w-1/2 h-full rounded-l-3xl bg-gradient-to-r from-[#92003A] to-[#F62477] border-y-4 border-l-4 border-[#FFE185] shadow-[0_30px_70px_rgba(0,0,0,0.7)] flex flex-col justify-between p-6 overflow-hidden origin-right"
+              transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+              className="absolute left-0 w-1/2 h-full rounded-l-3xl bg-gradient-to-r from-[#92003A] to-[#F62477] border-y-4 border-l-4 border-[#FFE185] shadow-[0_30px_70px_rgba(0,0,0,0.7)] flex flex-col justify-between p-6 overflow-hidden origin-right z-20 cursor-pointer"
+              onClick={() => setExplosionStage(explosionStage === 'packaged' ? 'burst' : 'packaged')}
             >
-              {/* Foil metallic gloss */}
               <div className="absolute inset-0 bg-gradient-to-tr from-white/20 via-transparent to-black/30 pointer-events-none" />
               <div className="text-[11px] font-black text-[#FFE185] tracking-widest uppercase">
                 HYPER-SNACK
@@ -502,13 +491,14 @@ export const HomePage = () => {
 
             {/* Right Wrapper Flap */}
             <motion.div 
-              style={{ 
-                x: foilRightX,
-                rotateY: foilRightRotate,
-                scale: packScale,
-                rotateZ: 4
+              animate={{ 
+                x: explosionStage === 'packaged' ? 0 : (explosionStage === 'burst' ? 110 : 160),
+                rotateY: explosionStage === 'packaged' ? 0 : (explosionStage === 'burst' ? 35 : 55),
+                rotateZ: explosionStage === 'packaged' ? 0 : 6
               }}
-              className="absolute right-0 w-1/2 h-full rounded-r-3xl bg-gradient-to-l from-[#92003A] to-[#F62477] border-y-4 border-r-4 border-[#FFE185] shadow-[0_30px_70px_rgba(0,0,0,0.7)] flex flex-col justify-between p-6 items-end overflow-hidden origin-left"
+              transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+              className="absolute right-0 w-1/2 h-full rounded-r-3xl bg-gradient-to-l from-[#92003A] to-[#F62477] border-y-4 border-r-4 border-[#FFE185] shadow-[0_30px_70px_rgba(0,0,0,0.7)] flex flex-col justify-between p-6 items-end overflow-hidden origin-left z-20 cursor-pointer"
+              onClick={() => setExplosionStage(explosionStage === 'packaged' ? 'burst' : 'packaged')}
             >
               <div className="absolute inset-0 bg-gradient-to-tl from-white/20 via-transparent to-black/30 pointer-events-none" />
               <div className="px-2 py-1 rounded-md bg-[#FFE185] text-[#92003A] text-[10px] font-black uppercase">
@@ -524,146 +514,148 @@ export const HomePage = () => {
 
             {/* Center Exposed Product Core (The ultra-processed interior) */}
             <motion.div 
-              style={{ scale: packScale }}
-              className="w-48 sm:w-60 h-72 sm:h-80 rounded-2xl bg-gradient-to-b from-[#3D1A00] to-[#1F0C00] border-2 border-[#FFE185]/40 shadow-2xl flex flex-col items-center justify-center p-4 text-center z-10"
+              animate={{ 
+                scale: explosionStage === 'packaged' ? 0.9 : 1.05,
+                opacity: explosionStage === 'packaged' ? 0.2 : 1
+              }}
+              transition={{ duration: 0.5 }}
+              className="w-48 sm:w-56 h-64 sm:h-72 rounded-2xl bg-gradient-to-b from-[#3D1A00] to-[#120500] border-2 border-[#FFE185]/60 shadow-[0_0_50px_rgba(255,225,133,0.3)] flex flex-col items-center justify-center p-4 text-center z-10"
             >
-              <Flame className="w-12 h-12 text-[#FFE185] animate-pulse mb-2" />
-              <span className="font-heading font-black text-xl sm:text-2xl text-[#FFE185] uppercase">
+              <Flame className="w-14 h-14 text-[#FFE185] animate-pulse mb-2" />
+              <span className="font-heading font-black text-2xl sm:text-3xl text-[#FFE185] uppercase">
                 540 KCAL
               </span>
-              <span className="text-xs font-bold text-white/80 mt-1">
+              <span className="text-xs font-bold text-white/90 mt-1">
                 Refined Sugar & Fat Matrix
+              </span>
+              <span className="text-[10px] font-mono text-[#FFADEE] mt-2 bg-black/50 px-2 py-1 rounded">
+                E322 • E471 • E150d
               </span>
             </motion.div>
           </div>
+        </div>
 
-          {/* 6 RADIAL INGREDIENT EXPLOSION CALLOUT CARDS */}
-          <motion.div 
-            style={{ opacity: burstOpacity }}
-            className="absolute inset-0 pointer-events-none z-30 max-w-7xl mx-auto flex items-center justify-center"
-          >
-            {/* Top-Left: Refined Sugar */}
+        {/* 6 RADIAL INGREDIENT EXPLOSION CALLOUT CARDS (Always Rich & Visible) */}
+        <div className="relative w-full max-w-7xl mx-auto z-30 mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            
+            {/* Card 1: Refined Sugar */}
             <motion.div 
-              style={{
-                x: useTransform(explosionProgress, [0.3, 0.65], [-50, -280]),
-                y: useTransform(explosionProgress, [0.3, 0.65], [0, -180]),
-                scale: useTransform(explosionProgress, [0.3, 0.65], [0.6, 1])
-              }}
-              className="absolute p-4 sm:p-5 rounded-2xl bg-[#92003A]/95 backdrop-blur-xl border-2 border-[#FFE185] text-white shadow-2xl w-60 sm:w-72"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="p-6 rounded-3xl bg-black/60 backdrop-blur-xl border-2 border-[#FFE185] text-white shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:border-white transition-all"
             >
               <div className="flex items-center justify-between text-xs font-black text-[#FFE185] uppercase">
                 <span>58% REFINED SUGAR</span>
-                <Flame className="w-4 h-4 text-[#FFE185]" />
+                <Flame className="w-5 h-5 text-[#FFE185]" />
               </div>
-              <p className="mt-1.5 text-xs text-white/90 leading-snug">
-                14 sugar cubes equivalent. Causes rapid insulin spikes followed by extreme energy crashes.
+              <div className="font-heading font-black text-2xl text-white mt-2">
+                14 Sugar Cubes
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed">
+                Stripped of natural fibre. Rapidly spikes blood glucose, forcing excessive insulin release followed by acute fatigue.
               </p>
             </motion.div>
 
-            {/* Top-Right: Palm Oil */}
+            {/* Card 2: Palm Oil */}
             <motion.div 
-              style={{
-                x: useTransform(explosionProgress, [0.3, 0.65], [50, 280]),
-                y: useTransform(explosionProgress, [0.3, 0.65], [0, -180]),
-                scale: useTransform(explosionProgress, [0.3, 0.65], [0.6, 1])
-              }}
-              className="absolute p-4 sm:p-5 rounded-2xl bg-[#92003A]/95 backdrop-blur-xl border-2 border-[#FFE185] text-white shadow-2xl w-60 sm:w-72"
+              animate={{ y: [0, 6, 0] }}
+              transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+              className="p-6 rounded-3xl bg-black/60 backdrop-blur-xl border-2 border-[#FFADEE] text-white shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:border-white transition-all"
             >
-              <div className="flex items-center justify-between text-xs font-black text-[#FFE185] uppercase">
+              <div className="flex items-center justify-between text-xs font-black text-[#FFADEE] uppercase">
                 <span>HYDROGENATED PALM OIL</span>
-                <Droplet className="w-4 h-4 text-[#FFE185]" />
+                <Droplet className="w-5 h-5 text-[#FFADEE]" />
               </div>
-              <p className="mt-1.5 text-xs text-white/90 leading-snug">
-                High in saturated palmitic acid. Engineered for 2-year shelf stability and melting mouthfeel.
+              <div className="font-heading font-black text-2xl text-white mt-2">
+                32% Saturated Lipids
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed">
+                Chemically stabilized for a 2-year shelf life. Resists oxidation and creates an artificial melt-in-mouth mouthfeel.
               </p>
             </motion.div>
 
-            {/* Mid-Left: Maltodextrin */}
+            {/* Card 3: Maltodextrin */}
             <motion.div 
-              style={{
-                x: useTransform(explosionProgress, [0.3, 0.65], [-40, -320]),
-                y: useTransform(explosionProgress, [0.3, 0.65], [0, 40]),
-                scale: useTransform(explosionProgress, [0.3, 0.65], [0.6, 1])
-              }}
-              className="absolute p-4 sm:p-5 rounded-2xl bg-black/85 backdrop-blur-xl border border-white/40 text-white shadow-2xl w-60 sm:w-72 hidden sm:block"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+              className="p-6 rounded-3xl bg-black/60 backdrop-blur-xl border-2 border-white/30 text-white shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:border-[#FFE185] transition-all"
             >
-              <div className="flex items-center justify-between text-xs font-black text-[#FFADEE] uppercase">
+              <div className="flex items-center justify-between text-xs font-black text-[#FFE185] uppercase">
                 <span>MALTODEXTRIN BULK</span>
-                <Wheat className="w-4 h-4 text-[#FFADEE]" />
+                <Wheat className="w-5 h-5 text-[#FFE185]" />
               </div>
-              <p className="mt-1.5 text-xs text-white/90 leading-snug">
-                Glycemic Index of 110 (higher than pure table sugar). Cheap bulking agent used to pad volume.
+              <div className="font-heading font-black text-2xl text-white mt-2">
+                GI Index 110
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed">
+                Hydrolyzed corn starch with a glycemic index higher than pure table sugar. Used as inexpensive volume padding.
               </p>
             </motion.div>
 
-            {/* Mid-Right: Emulsifiers */}
+            {/* Card 4: Emulsifiers */}
             <motion.div 
-              style={{
-                x: useTransform(explosionProgress, [0.3, 0.65], [40, 320]),
-                y: useTransform(explosionProgress, [0.3, 0.65], [0, 40]),
-                scale: useTransform(explosionProgress, [0.3, 0.65], [0.6, 1])
-              }}
-              className="absolute p-4 sm:p-5 rounded-2xl bg-black/85 backdrop-blur-xl border border-white/40 text-white shadow-2xl w-60 sm:w-72 hidden sm:block"
+              animate={{ y: [0, 6, 0] }}
+              transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+              className="p-6 rounded-3xl bg-black/60 backdrop-blur-xl border-2 border-[#FFADEE] text-white shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:border-white transition-all"
             >
               <div className="flex items-center justify-between text-xs font-black text-[#FFADEE] uppercase">
-                <span>LECITHIN & E471</span>
-                <Atom className="w-4 h-4 text-[#FFADEE]" />
+                <span>SYNTHETIC EMULSIFIERS</span>
+                <Atom className="w-5 h-5 text-[#FFADEE]" />
               </div>
-              <p className="mt-1.5 text-xs text-white/90 leading-snug">
-                Synthetic emulsifier matrix that artificially binds oil and water to bypass natural satiety cues.
+              <div className="font-heading font-black text-2xl text-white mt-2">
+                E322 & E471 Matrix
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed">
+                Engineered to bind oil and water together into an inseparable paste that bypasses normal gastrointestinal fullness cues.
               </p>
             </motion.div>
 
-            {/* Bottom-Left: Sodium Metabisulfite */}
+            {/* Card 5: Sodium Metabisulfite */}
             <motion.div 
-              style={{
-                x: useTransform(explosionProgress, [0.3, 0.65], [-30, -240]),
-                y: useTransform(explosionProgress, [0.3, 0.65], [0, 220]),
-                scale: useTransform(explosionProgress, [0.3, 0.65], [0.6, 1])
-              }}
-              className="absolute p-4 sm:p-5 rounded-2xl bg-[#92003A]/95 backdrop-blur-xl border-2 border-[#FFE185] text-white shadow-2xl w-60 sm:w-72"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
+              className="p-6 rounded-3xl bg-black/60 backdrop-blur-xl border-2 border-[#FFE185] text-white shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:border-white transition-all"
             >
               <div className="flex items-center justify-between text-xs font-black text-[#FFE185] uppercase">
-                <span>SODIUM METABISULFITE</span>
-                <ShieldAlert className="w-4 h-4 text-[#FFE185]" />
+                <span>PRESERVATIVE E223</span>
+                <ShieldAlert className="w-5 h-5 text-[#FFE185]" />
               </div>
-              <p className="mt-1.5 text-xs text-white/90 leading-snug">
-                Industrial preservative and bleaching agent to keep snacks looking fresh months after production.
+              <div className="font-heading font-black text-2xl text-white mt-2">
+                Sodium Metabisulfite
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed">
+                Industrial antioxidant bleaching agent applied during manufacturing to prevent discoloration on store shelves.
               </p>
             </motion.div>
 
-            {/* Bottom-Right: Artificial Flavours */}
+            {/* Card 6: Bliss Point */}
             <motion.div 
-              style={{
-                x: useTransform(explosionProgress, [0.3, 0.65], [30, 240]),
-                y: useTransform(explosionProgress, [0.3, 0.65], [0, 220]),
-                scale: useTransform(explosionProgress, [0.3, 0.65], [0.6, 1])
-              }}
-              className="absolute p-4 sm:p-5 rounded-2xl bg-[#92003A]/95 backdrop-blur-xl border-2 border-[#FFE185] text-white shadow-2xl w-60 sm:w-72"
+              animate={{ y: [0, 6, 0] }}
+              transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
+              className="p-6 rounded-3xl bg-black/60 backdrop-blur-xl border-2 border-[#F62477] text-white shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:border-white transition-all"
             >
-              <div className="flex items-center justify-between text-xs font-black text-[#FFE185] uppercase">
-                <span>SYNTHETIC BLISS POINT</span>
-                <Zap className="w-4 h-4 text-[#FFE185]" />
+              <div className="flex items-center justify-between text-xs font-black text-white uppercase">
+                <span className="px-2 py-0.5 rounded bg-[#F62477] text-white">ENGINEERED CRAVING</span>
+                <Zap className="w-5 h-5 text-[#FFE185]" />
               </div>
-              <p className="mt-1.5 text-xs text-white/90 leading-snug">
-                Laboratory formulated vanillin and salt ratio calibrated to stimulate compulsive eating.
+              <div className="font-heading font-black text-2xl text-[#FFE185] mt-2">
+                Laboratory Bliss Point
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed">
+                Synthetic vanillin and sodium precisely calibrated to activate hedonic hunger circuits and keep hands reaching into the bag.
               </p>
             </motion.div>
-          </motion.div>
 
-          {/* Bottom Prompt */}
-          <div className="absolute bottom-6 z-30 text-center">
-            <span className="text-[11px] font-black text-[#FFE185] uppercase tracking-widest bg-black/40 px-4 py-1.5 rounded-full border border-white/20">
-              KEEP SCROLLING TO DECODE THE MACROS ↓
-            </span>
           </div>
-        </motion.div>
+        </div>
+
       </section>
 
       {/* =========================================================================
           SCENE 03 — INGREDIENT REVEAL (Massive Kinetic Editorial Showcase)
           ========================================================================= */}
-      <section className="relative w-full py-28 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#92003A] via-[#4A001D] to-[#92003A] overflow-hidden">
+      <section className="relative w-full py-28 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#4A001D] via-[#92003A] to-[#92003A] overflow-hidden">
         
         {/* Glow Halos */}
         <div className="absolute top-1/2 left-0 w-96 h-96 rounded-full bg-[#F62477]/20 blur-3xl pointer-events-none" />
@@ -673,7 +665,7 @@ export const HomePage = () => {
           {/* Section Header */}
           <div className="text-center max-w-4xl mx-auto mb-20">
             <span className="text-[#FFE185] font-black text-xs sm:text-sm tracking-widest uppercase block mb-3">
-              SCENE 03 — EDITORIAL SPOTLIGHT
+              EDITORIAL SPOTLIGHT
             </span>
             <h2 className="font-heading font-black text-4xl sm:text-7xl md:text-8xl uppercase text-white tracking-tight leading-none drop-shadow-xl">
               EVERY INGREDIENT HAS A STORY.
@@ -691,7 +683,7 @@ export const HomePage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                 <div className="lg:col-span-8">
                   <span className="px-3.5 py-1 rounded-full bg-[#FFE185] text-[#92003A] font-black text-xs uppercase tracking-wider">
-                    01 • THE SWEET TRAP
+                    THE SWEET TRAP
                   </span>
                   <div className="font-heading font-black text-6xl sm:text-8xl md:text-9xl text-white tracking-tighter uppercase mt-4">
                     58 GRAMS
@@ -716,7 +708,7 @@ export const HomePage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                 <div className="lg:col-span-8">
                   <span className="px-3.5 py-1 rounded-full bg-[#FFADEE] text-[#92003A] font-black text-xs uppercase tracking-wider">
-                    02 • THE TEXTURE MASK
+                    THE TEXTURE MASK
                   </span>
                   <div className="font-heading font-black text-6xl sm:text-8xl md:text-9xl text-white tracking-tighter uppercase mt-4">
                     32% LIPIDS
@@ -741,7 +733,7 @@ export const HomePage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                 <div className="lg:col-span-8">
                   <span className="px-3.5 py-1 rounded-full bg-[#FFE185] text-[#92003A] font-black text-xs uppercase tracking-wider">
-                    03 • THE BLISS ENGINE
+                    THE BLISS ENGINE
                   </span>
                   <div className="font-heading font-black text-5xl sm:text-7xl md:text-8xl text-white tracking-tighter uppercase mt-4">
                     E322 • E471
@@ -766,7 +758,7 @@ export const HomePage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                 <div className="lg:col-span-8">
                   <span className="px-3.5 py-1 rounded-full bg-[#FFE185] text-[#92003A] font-black text-xs uppercase tracking-wider">
-                    04 • THE STEALTH SHIELD
+                    THE STEALTH SHIELD
                   </span>
                   <div className="font-heading font-black text-6xl sm:text-8xl md:text-9xl text-white tracking-tighter uppercase mt-4">
                     780 MG
@@ -808,7 +800,7 @@ export const HomePage = () => {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
             <div>
               <span className="text-[#FFE185] font-black text-xs sm:text-sm tracking-widest uppercase block mb-3">
-                SCENE 04 — NUTRITION DECODE
+                NUTRITION DECODE
               </span>
               <h2 className="font-heading font-black text-5xl sm:text-7xl md:text-8xl uppercase text-white tracking-tight leading-none">
                 WHAT'S REALLY INSIDE?
@@ -973,7 +965,7 @@ export const HomePage = () => {
           {/* Header */}
           <div className="text-center max-w-4xl mx-auto mb-16">
             <span className="text-[#FFE185] font-black text-xs sm:text-sm tracking-widest uppercase block mb-3">
-              SCENE 05 — THE BARCODE MOMENT
+              THE BARCODE MOMENT
             </span>
             <h2 className="font-heading font-black text-4xl sm:text-7xl md:text-8xl uppercase text-white tracking-tight leading-none drop-shadow-2xl">
               ONE SCAN. A WHOLE NEW PERSPECTIVE.
